@@ -1,0 +1,567 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quake Sorter mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<style>
+:root {
+  color-scheme: light;
+  --surface: #fffdf8;
+  --page: #fbf4e4;
+  --ink: #26323d;
+  --ink-2: #55616c;
+  --muted: #7b858d;
+  --hairline: #eae4d6;
+  --axis: #cfc8b8;
+  --background: #009b94;
+  --triggered: #ee5a45;
+  --accent: #5a55c8;
+  --accent-soft: #eeedfb;
+  --warn-bg: #fff3d6;
+  --good-text: #006300;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--page); color: var(--ink);
+  font: 15px/1.45 Nunito, system-ui, -apple-system, "Segoe UI", sans-serif;
+  display: grid; grid-template-columns: minmax(0, 1fr) 390px; height: 100vh; overflow: hidden;
+}
+#map-wrap { position: relative; min-width: 0; }
+#map { position: absolute; inset: 0; }
+#mock-pill, #hint {
+  position: absolute; left: 14px; z-index: 2; border-radius: 999px; padding: 6px 14px;
+  background: var(--surface); box-shadow: 0 2px 10px rgba(38,50,61,.16); font-weight: 700; font-size: 13px;
+}
+#mock-pill { top: 14px; }
+#hint { top: 54px; background: var(--accent); color: #fff; max-width: calc(100% - 28px); }
+#legend {
+  position: absolute; left: 14px; bottom: 34px; z-index: 2; background: var(--surface); border-radius: 14px;
+  padding: 10px 14px; box-shadow: 0 2px 10px rgba(38,50,61,.16); font-size: 12px; width: 220px;
+}
+#legend strong { display: block; margin-bottom: 5px; font-size: 13px; }
+#legend .ramp { height: 10px; border-radius: 5px; background: linear-gradient(90deg, var(--triggered), #bdb9ae, var(--background)); }
+#legend .ends { display: flex; justify-content: space-between; color: var(--ink-2); margin-top: 3px; }
+#legend .note { color: var(--ink-2); margin-top: 6px; }
+aside { background: var(--surface); overflow-y: auto; padding: 22px; box-shadow: -4px 0 18px rgba(38,50,61,.08); z-index: 3; }
+h1 { font-size: 23px; font-weight: 800; margin: 0 0 2px; }
+h2 { font-size: 17px; font-weight: 800; margin: 20px 0 8px; }
+h3 { font-size: 14px; font-weight: 800; margin: 18px 0 6px; }
+p { margin: 6px 0; }
+.sub { color: var(--ink-2); margin: 0 0 12px; }
+ol.steps { list-style: none; padding: 0; margin: 12px 0 0; display: flex; gap: 6px; font-size: 12px; font-weight: 700; color: var(--muted); }
+ol.steps li { flex: 1; text-align: center; padding: 5px 2px; border-radius: 10px; background: var(--page); }
+ol.steps li.on { background: var(--accent-soft); color: var(--accent); }
+button { font: inherit; font-weight: 700; border: 0; border-radius: 12px; padding: 9px 14px; cursor: pointer; background: var(--accent-soft); color: var(--accent); }
+button:hover { filter: brightness(.96); }
+button:focus-visible, input:focus-visible, summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+button.primary { background: var(--accent); color: #fff; width: 100%; padding: 12px; font-size: 16px; margin-top: 12px; }
+button:disabled { background: var(--hairline); color: var(--muted); cursor: not-allowed; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
+.drop { border: 2px dashed var(--axis); border-radius: 18px; padding: 20px; text-align: center; background: var(--page); }
+.drop .big { font-size: 34px; line-height: 1.2; }
+code { font: 12px ui-monospace, Consolas, monospace; background: var(--page); padding: 2px 5px; border-radius: 6px; overflow-wrap: anywhere; }
+.report { margin: 12px 0 0; padding: 0; list-style: none; }
+.report li { padding: 8px 10px; border-radius: 10px; margin-top: 6px; background: var(--page); }
+.report li.warn { background: var(--warn-bg); }
+summary { cursor: pointer; font-weight: 700; }
+label { display: block; font-weight: 700; font-size: 13px; margin-top: 10px; }
+input[type=number], input[type=date] { width: 100%; font: inherit; padding: 7px 9px; border: 1px solid var(--axis); border-radius: 10px; background: #fff; color: var(--ink); margin-top: 3px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; }
+.count { margin-top: 12px; padding: 12px; border-radius: 14px; background: var(--accent-soft); }
+.count b { font-size: 22px; font-weight: 800; }
+.notice { margin-top: 8px; padding: 9px 11px; border-radius: 10px; background: var(--warn-bg); font-size: 14px; }
+.small { font-size: 13px; color: var(--ink-2); }
+ul.job { list-style: none; padding: 0; margin: 10px 0; }
+ul.job li { display: flex; gap: 10px; padding: 9px 0; color: var(--muted); border-bottom: 1px solid var(--hairline); }
+ul.job li.now { color: var(--ink); font-weight: 800; }
+ul.job li.past { color: var(--ink-2); }
+.link { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
+.link code { flex: 1; padding: 8px; }
+input[type=range] { width: 100%; accent-color: var(--accent); margin: 4px 0; }
+.cut { display: flex; justify-content: space-between; align-items: baseline; font-weight: 800; }
+.cut output { font-size: 20px; }
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.tile { padding: 12px; border-radius: 14px; background: var(--page); }
+.tile .lab { font-size: 13px; font-weight: 700; color: var(--ink-2); display: flex; gap: 6px; align-items: center; }
+.tile .num { font-size: 27px; font-weight: 800; line-height: 1.2; }
+.dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: none; }
+.seg { display: flex; gap: 4px; margin-top: 6px; }
+.seg button { flex: 1; padding: 7px 4px; background: var(--page); color: var(--ink-2); }
+.seg button[aria-pressed=true] { background: var(--accent); color: #fff; }
+#hist { position: relative; }
+#hist svg { display: block; width: 100%; height: auto; }
+#tip { position: absolute; pointer-events: none; background: var(--ink); color: #fff; padding: 4px 8px; border-radius: 8px; font-size: 12px; white-space: nowrap; transform: translate(-50%, -100%); }
+.key { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--ink-2); margin: 4px 0; }
+.key span { display: inline-flex; gap: 5px; align-items: center; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; margin-top: 6px; }
+th, td { text-align: left; padding: 5px 4px; border-bottom: 1px solid var(--hairline); }
+td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+.good { color: var(--good-text); font-weight: 800; }
+.star { width: 26px; height: 26px; cursor: default; filter: drop-shadow(0 1px 2px rgba(38,50,61,.45)); }
+.maplibregl-popup-content { border-radius: 12px; font: 13px Nunito, system-ui, sans-serif; color: var(--ink); padding: 8px 12px; }
+[hidden] { display: none !important; }
+@media (max-width: 800px) {
+  body { display: block; height: auto; overflow: auto; }
+  #map-wrap { height: 55vh; }
+  aside { box-shadow: none; padding: 18px 16px; }
+  #legend { bottom: 28px; width: 190px; }
+  #legend .note { display: none; }
+}
+</style>
+</head>
+<body>
+<div id="map-wrap">
+  <div id="map" role="application" aria-label="Map of earthquakes"></div>
+  <div id="mock-pill">Mockup: all data here is made up</div>
+  <div id="hint" role="status" hidden>Click to add corners. Click the first corner or press Enter to finish.</div>
+  <div id="legend" hidden>
+    <strong>Chance of being background</strong>
+    <div class="ramp"></div>
+    <div class="ends"><span>0 triggered</span><span>1 background</span></div>
+    <div class="note">Bigger dot, bigger magnitude. Grey dots are outside your study. Stars mark the 3 largest inside.</div>
+  </div>
+</div>
+
+<aside>
+  <h1>Quake Sorter</h1>
+  <p class="sub">Which earthquakes are background, and which were triggered by others?</p>
+  <ol class="steps" aria-label="Progress">
+    <li id="s-upload">1 Upload</li><li id="s-area">2 Area</li><li id="s-job">3 Wait</li><li id="s-results">4 Results</li>
+  </ol>
+
+  <section id="v-upload">
+    <h2>Upload your catalogue</h2>
+    <div class="drop">
+      <div class="big" aria-hidden="true">📂</div>
+      <p>A CSV file with these columns:</p>
+      <p><code>time, longitude, latitude, depth, magnitude</code></p>
+      <p class="small">Depth may be empty, because the model doesn't use it.</p>
+      <button id="sample">Try the sample catalogue</button>
+      <p class="small">Real file upload isn't connected in this mockup.</p>
+    </div>
+    <div id="report" hidden>
+      <h2>File check</h2>
+      <ul class="report">
+        <li>✅ <b id="r-ok"></b> rows ready</li>
+        <li>💡 <b>1,204</b> rows have no depth. That's fine.</li>
+        <li class="warn">⚠️ <b>12</b> rows will be skipped
+          <details><summary>See which ones</summary>
+            <table><thead><tr><th class="n">Line</th><th>Problem</th></tr></thead><tbody>
+              <tr><td class="n">18</td><td>Time can't be read: <code>2003-13-41</code></td></tr>
+              <tr><td class="n">406</td><td>Latitude out of range: <code>135.2</code></td></tr>
+              <tr><td class="n">2,951</td><td>Magnitude is empty</td></tr>
+              <tr><td colspan="2" class="small">and 9 more</td></tr>
+            </tbody></table>
+          </details>
+        </li>
+      </ul>
+      <button class="primary" id="to-area">Continue</button>
+    </div>
+  </section>
+
+  <section id="v-area" hidden>
+    <h2>Choose your study area</h2>
+    <div class="row">
+      <button id="draw">✏️ Draw polygon</button>
+      <button id="example">Ridgecrest example</button>
+      <button id="clear" hidden>Clear</button>
+    </div>
+    <div class="grid2">
+      <label>From<input type="date" id="from" value="1990-01-01"></label>
+      <label>To<input type="date" id="to" value="2025-12-31"></label>
+    </div>
+    <label>Smallest magnitude<input type="number" id="mc" value="3" min="2.5" max="6" step="0.1"></label>
+    <div class="count"><b id="n-in">0</b> events in your study
+      <div class="small">Events outside it are still used as possible triggers.</div>
+    </div>
+    <div class="notice" id="area-note" role="status" hidden></div>
+    <button class="primary" id="process" disabled>Process</button>
+  </section>
+
+  <section id="v-job" hidden>
+    <h2 id="job-title">Your catalogue is in the queue</h2>
+    <ul class="job" id="job-list"></ul>
+    <p class="small" id="checked" role="status"></p>
+    <h3>Come back any time</h3>
+    <p class="small">This page updates by itself. You can also close it and return with this link:</p>
+    <div class="link"><code id="link"></code><button id="copy">Copy</button></div>
+    <p class="small">Sped up for this mockup. A real run takes minutes.</p>
+  </section>
+
+  <section id="v-results" hidden>
+    <h2>Results</h2>
+    <p class="good">✓ Fit looks valid: p and q are both above 1</p>
+    <div class="cut" style="margin-top:12px"><label for="cut" style="margin:0">Probability cutoff</label><output id="cut-out"></output></div>
+    <input type="range" id="cut" min="0" max="1" step="0.05" value="0.5">
+    <div class="tiles">
+      <div class="tile"><div class="lab"><span class="dot" style="background:var(--background)"></span>Background</div><div class="num" id="n-bg"></div><div class="small" id="pc-bg"></div></div>
+      <div class="tile"><div class="lab"><span class="dot" style="background:var(--triggered)"></span>Triggered</div><div class="num" id="n-tr"></div><div class="small" id="pc-tr"></div></div>
+    </div>
+    <p class="small">Expected background: <b id="n-exp"></b> events. This sums every probability, so the cutoff doesn't change it.</p>
+    <h3>Show on map</h3>
+    <div class="seg" role="group" aria-label="Show on map">
+      <button data-show="all" aria-pressed="true">All</button>
+      <button data-show="background" aria-pressed="false">Background</button>
+      <button data-show="triggered" aria-pressed="false">Triggered</button>
+    </div>
+    <h3>Events in your study by probability</h3>
+    <div class="key"><span><span class="dot" style="background:var(--triggered)"></span>Below cutoff</span><span><span class="dot" style="background:var(--background)"></span>At or above cutoff</span></div>
+    <div id="hist"><div id="tip" hidden></div></div>
+    <details><summary class="small">Show as a table</summary><table id="hist-table"></table></details>
+    <h3>Fitted parameters</h3>
+    <table><tbody id="params"></tbody></table>
+    <button id="restart" style="margin-top:16px">Start again</button>
+  </section>
+</aside>
+
+<script>
+"use strict";
+const TEAL = "#009b94", CORAL = "#ee5a45", MID = "#bdb9ae", OUTSIDE = "#c6c8c6";
+const T0 = Date.UTC(1990, 0, 1), DAY = 864e5, SPAN = 13149; // 36 years in days
+const JOB_ID = "x7Kp2mQ9vT4n";
+const FEW_EVENTS = 300; // shortcut: placeholder warning level, set it from fits on small polygons
+const RIDGECREST = [[-118.05, 36.2], [-117.1, 36.2], [-117.1, 35.25], [-118.05, 35.25]];
+const $ = id => document.getElementById(id);
+const fmt = n => n.toLocaleString("en-US");
+
+// Made-up catalogue: scatter along a fault line plus a few aftershock-style clusters.
+let seed = 42;
+function rnd() { seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }
+const gauss = () => Math.sqrt(-2 * Math.log(1 - rnd())) * Math.cos(2 * Math.PI * rnd());
+const mag = () => Math.min(2.5 - Math.log10(1 - rnd()), 6.2);
+function makeEvents() {
+  const ev = [], fault = [[-124.3, 40.3], [-122.6, 38], [-121.4, 36.8], [-120.3, 35.7], [-118.9, 34.8], [-117.4, 34.3], [-115.9, 33.4], [-115.3, 32.6]];
+  for (let i = 0; i < 8000; i++) {
+    const s = rnd() * (fault.length - 1), k = Math.floor(s), f = s - k;
+    const spread = rnd() < 0.25 ? 0.9 : 0.22;
+    ev.push({ lon: fault[k][0] + (fault[k + 1][0] - fault[k][0]) * f + gauss() * spread, lat: fault[k][1] + (fault[k + 1][1] - fault[k][1]) * f + gauss() * spread,
+      m: mag(), t: rnd() * SPAN, p: Math.pow(rnd(), 0.3) });
+  }
+  const clusters = [[-117.58, 35.75, 5000, 10780, 7.1], [-116.5, 34.35, 3500, 900, 7.0], [-118.55, 34.25, 1500, 1480, 6.7], [-121.85, 37.05, 1000, 100, 6.8], [-116.27, 34.6, 1000, 3570, 7.0]];
+  for (const [lon, lat, n, t0, top] of clusters) {
+    ev.push({ lon, lat, m: top, t: t0, p: 0.93 });
+    for (let i = 0; i < n; i++) {
+      const along = gauss() * 0.14, across = gauss() * 0.035;
+      ev.push({ lon: lon + along * 0.6 + across, lat: lat - along * 0.8 + across, m: mag(), t: Math.min(t0 + -Math.log(1 - rnd()) * 400, SPAN), p: 0.9 * Math.pow(rnd(), 3.5) });
+    }
+  }
+  return ev.sort((a, b) => a.m - b.m);
+}
+const EVENTS = makeEvents();
+
+let state = { step: "upload", corners: [], drawing: false, closed: false, cutoff: 0.5, show: "all", loaded: false };
+let targets = [], stars = [], jobTimer = null, cursor = null;
+let map = null;
+
+function inPoly(x, y, c) {
+  let inside = false;
+  for (let i = 0, j = c.length - 1; i < c.length; j = i++)
+    if ((c[i][1] > y) !== (c[j][1] > y) && x < (c[j][0] - c[i][0]) * (y - c[i][1]) / (c[j][1] - c[i][1]) + c[i][0]) inside = !inside;
+  return inside;
+}
+function selfCrossing(c) {
+  const side = (a, b, p) => (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0]);
+  for (let i = 0; i < c.length; i++) for (let j = i + 2; j < c.length; j++) {
+    if (i === 0 && j === c.length - 1) continue;
+    const a = c[i], b = c[(i + 1) % c.length], d = c[j], e = c[(j + 1) % c.length];
+    if (side(a, b, d) * side(a, b, e) < 0 && side(d, e, a) * side(d, e, b) < 0) return true;
+  }
+  return false;
+}
+function dayOf(id) { return (Date.parse($(id).value) - T0) / DAY; }
+
+// Work out which events are in the study, then repaint the map to match.
+function refreshTargets() {
+  const from = dayOf("from"), to = dayOf("to"), mc = +$("mc").value;
+  targets = [];
+  const features = EVENTS.map(e => {
+    const inT = state.closed && e.m >= mc && e.t >= from && e.t <= to && inPoly(e.lon, e.lat, state.corners);
+    if (inT) targets.push(e);
+    return { type: "Feature", geometry: { type: "Point", coordinates: [e.lon, e.lat] }, properties: { m: e.m, p: e.p, t: e.t, inT: inT ? 1 : 0 } };
+  });
+  if (state.loaded) map.getSource("events").setData({ type: "FeatureCollection", features });
+  $("n-in").textContent = fmt(targets.length);
+  const note = $("area-note");
+  note.hidden = true;
+  if (state.closed && targets.length < FEW_EVENTS) {
+    note.hidden = false;
+    note.textContent = `⚠️ Only ${fmt(targets.length)} ${targets.length === 1 ? "event" : "events"}. With so few, the fit may not be reliable. Try a larger area, a longer period or a smaller magnitude.`;
+  }
+  $("process").disabled = !state.closed || targets.length === 0;
+}
+
+function paintEvents() {
+  if (!state.loaded) return;
+  const visible = state.step === "area" || state.step === "results";
+  map.setLayoutProperty("events", "visibility", visible ? "visible" : "none");
+  const results = state.step === "results";
+  map.setPaintProperty("events", "circle-color", results
+    ? ["case", ["==", ["get", "inT"], 1], ["interpolate", ["linear"], ["get", "p"], 0, CORAL, 0.5, MID, 1, TEAL], OUTSIDE]
+    : ["case", ["==", ["get", "inT"], 1], "#4f5d9e", OUTSIDE]);
+  map.setPaintProperty("events", "circle-opacity", ["case", ["==", ["get", "inT"], 1], 0.85, state.closed ? 0.45 : 0.7]);
+  let filter = null;
+  if (results && state.show === "background") filter = ["any", ["==", ["get", "inT"], 0], [">=", ["get", "p"], state.cutoff]];
+  if (results && state.show === "triggered") filter = ["any", ["==", ["get", "inT"], 0], ["<", ["get", "p"], state.cutoff]];
+  map.setFilter("events", filter);
+}
+
+function paintArea() {
+  if (!state.loaded) return;
+  const c = state.corners, features = c.map(v => ({ type: "Feature", geometry: { type: "Point", coordinates: v }, properties: {} }));
+  if (state.closed) features.push({ type: "Feature", geometry: { type: "Polygon", coordinates: [[...c, c[0]]] }, properties: {} });
+  else if (c.length) features.push({ type: "Feature", geometry: { type: "LineString", coordinates: cursor ? [...c, cursor] : c }, properties: {} });
+  map.getSource("area").setData({ type: "FeatureCollection", features });
+}
+
+function setStep(step) {
+  state.step = step;
+  for (const s of ["upload", "area", "job", "results"]) {
+    $("v-" + s).hidden = s !== step;
+    $("s-" + s).classList.toggle("on", s === step);
+  }
+  $("s-" + step).setAttribute("aria-current", "step");
+  $("legend").hidden = step !== "results";
+  paintEvents();
+  placeStars();
+}
+
+function placeStars() {
+  stars.forEach(s => s.remove());
+  stars = [];
+  if (state.step !== "results" || !map) return;
+  // EVENTS is sorted by magnitude, so the last targets are the largest.
+  for (const e of targets.slice(-3)) {
+    const el = document.createElement("div");
+    el.className = "star";
+    el.title = `M${e.m.toFixed(1)}, ${dateOf(e.t)}`;
+    el.innerHTML = '<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M12 2.5l2.9 6.2 6.8.8-5 4.6 1.3 6.7-6-3.3-6 3.3 1.3-6.7-5-4.6 6.8-.8z" fill="#ffc93c" stroke="#26323d" stroke-width="1.4" stroke-linejoin="round"/></svg>';
+    stars.push(new maplibregl.Marker({ element: el }).setLngLat([e.lon, e.lat]).addTo(map));
+  }
+}
+function dateOf(t) { return new Date(T0 + t * DAY).toISOString().slice(0, 10); }
+
+// Drawing
+function startDrawing() {
+  clearArea();
+  state.drawing = true;
+  $("hint").hidden = false;
+  map.doubleClickZoom.disable();
+  map.getCanvas().style.cursor = "crosshair";
+}
+function stopDrawing() {
+  state.drawing = false;
+  cursor = null;
+  $("hint").hidden = true;
+  map.doubleClickZoom.enable();
+  map.getCanvas().style.cursor = "";
+}
+function finishDrawing() {
+  if (state.corners.length < 3) return;
+  if (selfCrossing(state.corners)) {
+    $("area-note").hidden = false;
+    $("area-note").textContent = "⚠️ The polygon's edges cross. Please draw it again.";
+    state.corners = [];
+    paintArea();
+    return;
+  }
+  stopDrawing();
+  state.closed = true;
+  $("clear").hidden = false;
+  paintArea();
+  refreshTargets();
+  paintEvents();
+}
+function clearArea() {
+  if (state.drawing) stopDrawing();
+  state.corners = [];
+  state.closed = false;
+  $("clear").hidden = true;
+  paintArea();
+  refreshTargets();
+  paintEvents();
+}
+function useExample() {
+  clearArea();
+  state.corners = RIDGECREST.map(v => [...v]);
+  state.closed = true;
+  $("clear").hidden = false;
+  paintArea();
+  refreshTargets();
+  paintEvents();
+  if (map) map.fitBounds([[-119.2, 34.8], [-116, 36.6]], { padding: 40, duration: 600 });
+}
+
+// The polling pattern, faked: the page keeps asking how the job is doing until it is done.
+const JOB_STEPS = [["📥", "Queued, 2 ahead of you", 3], ["🔎", "Reading your catalogue", 2], ["⚙️", "Fitting the model", 6], ["📊", "Preparing results", 2]];
+function startJob() {
+  history.replaceState(null, "", "#/jobs/" + JOB_ID);
+  $("link").textContent = location.href.split("#")[0].split("/").pop() + "#/jobs/" + JOB_ID;
+  setStep("job");
+  let elapsed = 0, lastCheck = 0;
+  const total = JOB_STEPS.reduce((a, s) => a + s[2], 0);
+  const draw = () => {
+    let t = elapsed, now = JOB_STEPS.length - 1;
+    for (let i = 0; i < JOB_STEPS.length; i++) { if (t < JOB_STEPS[i][2]) { now = i; break; } t -= JOB_STEPS[i][2]; }
+    $("job-list").innerHTML = JOB_STEPS.map(([icon, text], i) => {
+      const label = i === 2 && i === now ? `Fitting the model, step ${Math.min(1 + Math.floor(t / JOB_STEPS[2][2] * 11), 11)} of 11` : text;
+      return `<li class="${i === now ? "now" : i < now ? "past" : ""}"><span aria-hidden="true">${i < now ? "✅" : icon}</span>${label}</li>`;
+    }).join("");
+    $("job-title").textContent = now === 0 ? "Your catalogue is in the queue" : "Working on your catalogue";
+    $("checked").textContent = `Checked ${elapsed - lastCheck === 0 ? "just now" : (elapsed - lastCheck) + " s ago"}`;
+  };
+  draw();
+  jobTimer = setInterval(() => {
+    elapsed++;
+    if (elapsed % 3 === 0) lastCheck = elapsed;
+    if (elapsed >= total) { clearInterval(jobTimer); showResults(); } else draw();
+  }, 1000);
+}
+
+// Results
+const PARAMS = [["mu", "0.62", "Background rate scale"], ["A", "0.31", "Aftershock productivity"], ["c", "0.021", "Time offset, days"], ["alpha", "1.35", "Productivity vs magnitude"],
+  ["p", "1.14", "Decay with time"], ["D", "0.0012", "Spatial scale"], ["q", "1.85", "Decay with distance"], ["gamma", "1.02", "Spatial scale vs magnitude"]];
+function showResults() {
+  $("params").innerHTML = PARAMS.map(([n, v, d]) => `<tr><td><b>${n}</b></td><td class="n">${v}</td><td class="small">${d}</td></tr>`).join("");
+  $("n-exp").textContent = fmt(Math.round(targets.reduce((a, e) => a + e.p, 0)));
+  setStep("results");
+  drawResults();
+}
+function drawResults() {
+  const n = targets.length, bg = targets.filter(e => e.p >= state.cutoff).length;
+  $("cut-out").textContent = state.cutoff.toFixed(2);
+  $("n-bg").textContent = fmt(bg);
+  $("n-tr").textContent = fmt(n - bg);
+  $("pc-bg").textContent = `${(100 * bg / n).toFixed(1)}% of ${fmt(n)}`;
+  $("pc-tr").textContent = `${(100 * (n - bg) / n).toFixed(1)}% of ${fmt(n)}`;
+  drawHist();
+  paintEvents();
+}
+function niceMax(v) { const m = Math.pow(10, Math.floor(Math.log10(v))); for (const k of [1, 2, 5, 10]) if (k * m >= v) return k * m; return v; }
+function drawHist() {
+  const BINS = 20, W = 346, H = 170, L = 38, R = 6, TOP = 18, B = 36, bins = new Array(BINS).fill(0);
+  for (const e of targets) bins[Math.min(Math.floor(e.p * BINS), BINS - 1)]++;
+  const top = niceMax(Math.max(...bins, 1)), bw = (W - L - R) / BINS, y = v => H - B - v / top * (H - B - TOP), x = p => L + p * (W - L - R);
+  let s = "";
+  for (const f of [0, 0.5, 1]) {
+    const v = top * f;
+    s += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="${f ? "#eae4d6" : "#cfc8b8"}"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="#55616c">${fmt(v)}</text>`;
+  }
+  bins.forEach((c, i) => {
+    const lo = i / BINS, px = x(lo) + 1, w = bw - 2, h = Math.max(y(0) - y(c), c ? 1 : 0), r = Math.min(4, w / 2, h);
+    const fill = lo + 1e-9 >= state.cutoff ? TEAL : CORAL;
+    if (h) s += `<path d="M${px} ${y(0)}V${y(0) - h + r}Q${px} ${y(0) - h} ${px + r} ${y(0) - h}H${px + w - r}Q${px + w} ${y(0) - h} ${px + w} ${y(0) - h + r}V${y(0)}Z" fill="${fill}"/>`;
+    s += `<rect x="${x(lo)}" y="${TOP}" width="${bw}" height="${H - B - TOP}" fill="transparent" data-i="${i}"/>`;
+  });
+  for (const f of [0, 0.25, 0.5, 0.75, 1]) s += `<text x="${x(f)}" y="${H - B + 15}" text-anchor="middle" font-size="11" fill="#55616c">${f}</text>`;
+  s += `<text x="${(L + W - R) / 2}" y="${H - 3}" text-anchor="middle" font-size="11" fill="#55616c">Probability of being background</text>`;
+  const cx = x(state.cutoff), anchor = state.cutoff > 0.8 ? "end" : state.cutoff < 0.2 ? "start" : "middle";
+  s += `<line x1="${cx}" x2="${cx}" y1="${TOP - 3}" y2="${y(0)}" stroke="#26323d" stroke-width="2" pointer-events="none"/><text x="${cx}" y="${TOP - 7}" text-anchor="${anchor}" font-size="11" font-weight="800" fill="#26323d">cutoff ${state.cutoff.toFixed(2)}</text>`;
+  const box = $("hist"), tip = $("tip");
+  box.querySelector("svg")?.remove();
+  box.insertAdjacentHTML("afterbegin", `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Histogram of the probability of being background, for ${fmt(targets.length)} events">${s}</svg>`);
+  const svg = box.querySelector("svg");
+  svg.addEventListener("mousemove", ev => {
+    const i = ev.target.dataset && ev.target.dataset.i;
+    if (i === undefined) { tip.hidden = true; return; }
+    const r = ev.target.getBoundingClientRect(), b = box.getBoundingClientRect();
+    tip.hidden = false;
+    tip.textContent = `${(i / BINS).toFixed(2)} to ${((+i + 1) / BINS).toFixed(2)}: ${fmt(bins[i])} events`;
+    const half = tip.offsetWidth / 2;
+    tip.style.left = Math.max(half, Math.min(r.left - b.left + r.width / 2, b.width - half)) + "px";
+    tip.style.top = (r.top - b.top + 14) + "px";
+  });
+  svg.addEventListener("mouseleave", () => { tip.hidden = true; });
+  $("hist-table").innerHTML = "<thead><tr><th>Probability</th><th class='n'>Events</th></tr></thead><tbody>" +
+    bins.map((c, i) => `<tr><td>${(i / BINS).toFixed(2)} to ${((i + 1) / BINS).toFixed(2)}</td><td class="n">${fmt(c)}</td></tr>`).join("") + "</tbody>";
+}
+
+function fullView() { if (map) map.fitBounds([[-125.5, 32], [-113.5, 41]], { padding: 30, duration: 800 }); }
+
+// Controls
+$("sample").onclick = () => { $("r-ok").textContent = fmt(EVENTS.length); $("report").hidden = false; };
+$("to-area").onclick = () => { setStep("area"); refreshTargets(); fullView(); };
+$("draw").onclick = startDrawing;
+$("example").onclick = useExample;
+$("clear").onclick = clearArea;
+for (const id of ["from", "to", "mc"]) $(id).addEventListener("change", () => { refreshTargets(); paintEvents(); });
+$("process").onclick = startJob;
+$("copy").onclick = async () => { try { await navigator.clipboard.writeText(location.href); $("copy").textContent = "Copied"; } catch { $("copy").textContent = "Select it"; } };
+$("cut").addEventListener("input", e => { state.cutoff = +e.target.value; drawResults(); });
+document.querySelectorAll(".seg button").forEach(b => b.onclick = () => {
+  state.show = b.dataset.show;
+  document.querySelectorAll(".seg button").forEach(o => o.setAttribute("aria-pressed", o === b));
+  paintEvents();
+});
+$("restart").onclick = () => { history.replaceState(null, "", location.pathname); location.reload(); };
+document.addEventListener("keydown", e => {
+  if (!state.drawing) return;
+  if (e.key === "Enter") finishDrawing();
+  if (e.key === "Escape") clearArea();
+});
+
+// Map
+function setupMap() {
+  map = new maplibregl.Map({ container: "map", style: "https://tiles.openfreemap.org/styles/positron", center: [-119, 37], zoom: 4.6, attributionControl: { compact: false } });
+  map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+  map.on("load", () => {
+    const tint = { background: ["background-color", "#fbf4e4"], water: ["fill-color", "#bce6ee"], park: ["fill-color", "#d6efcb"], landcover_wood: ["fill-color", "#dcf0d0"], landuse_residential: ["fill-color", "#f8edd8"] };
+    for (const [id, [prop, value]] of Object.entries(tint)) if (map.getLayer(id)) map.setPaintProperty(id, prop, value);
+    const size = ["-", ["get", "m"], 2.5];
+    map.addSource("events", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+    map.addLayer({ id: "events", type: "circle", source: "events", paint: {
+      "circle-radius": ["interpolate", ["linear"], ["zoom"], 5, ["+", 1, ["*", 0.9, size]], 10, ["+", 2.5, ["*", 2.4, size]]],
+      "circle-stroke-color": "#fffdf8", "circle-stroke-width": 0.5 } });
+    map.addSource("area", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+    map.addLayer({ id: "area-fill", type: "fill", source: "area", filter: ["==", ["geometry-type"], "Polygon"], paint: { "fill-color": "#5a55c8", "fill-opacity": 0.05 } });
+    map.addLayer({ id: "area-line", type: "line", source: "area", filter: ["!=", ["geometry-type"], "Point"], paint: { "line-color": "#5a55c8", "line-width": 2.5 } });
+    map.addLayer({ id: "area-dots", type: "circle", source: "area", filter: ["==", ["geometry-type"], "Point"], paint: { "circle-radius": 6, "circle-color": "#fffdf8", "circle-stroke-color": "#5a55c8", "circle-stroke-width": 2.5 } });
+    state.loaded = true;
+    refreshTargets();
+    paintArea();
+    paintEvents();
+    placeStars();
+  });
+  map.on("click", e => {
+    if (!state.drawing) return;
+    const c = state.corners;
+    if (c.length >= 3) {
+      const first = map.project(c[0]);
+      if (Math.hypot(first.x - e.point.x, first.y - e.point.y) < 12) return finishDrawing();
+    }
+    c.push([e.lngLat.lng, e.lngLat.lat]);
+    paintArea();
+  });
+  map.on("mousemove", e => { if (state.drawing) { cursor = [e.lngLat.lng, e.lngLat.lat]; paintArea(); } });
+  const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 8 });
+  map.on("mousemove", "events", e => {
+    if (state.drawing) return;
+    map.getCanvas().style.cursor = "pointer";
+    const f = e.features[0].properties;
+    let html = `<b>M${(+f.m).toFixed(1)}</b>, ${dateOf(+f.t)}`;
+    if (state.step === "results" && f.inT) html += `<br>Chance of being background: ${(+f.p).toFixed(2)}<br>${+f.p >= state.cutoff ? "Background" : "Triggered"} at this cutoff`;
+    else if (state.step === "results") html += "<br>Outside your study";
+    popup.setLngLat(e.lngLat).setHTML(html).addTo(map);
+  });
+  map.on("mouseleave", "events", () => { if (!state.drawing) map.getCanvas().style.cursor = ""; popup.remove(); });
+}
+
+if (window.maplibregl) setupMap();
+else { $("mock-pill").textContent = "The map library didn't load. Check your connection."; }
+
+// Opening a job link goes straight to its state, here always a finished job.
+if (location.hash.startsWith("#/jobs/")) {
+  state.corners = RIDGECREST.map(v => [...v]);
+  state.closed = true;
+  refreshTargets();
+  showResults();
+  if (map) map.once("load", () => { map.fitBounds([[-119.2, 34.8], [-116, 36.6]], { padding: 40, duration: 0 }); });
+} else setStep("upload");
+</script>
+</body>
+</html>
