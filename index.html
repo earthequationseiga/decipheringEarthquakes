@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Quake Sorter mockup</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,600;0,700;0,800;1,500&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <style>
@@ -29,7 +29,7 @@
 html, body { height: 100%; margin: 0; }
 body {
   background: var(--page); color: var(--ink);
-  font: 15px/1.45 Nunito, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font: 15px/1.45 Montserrat, system-ui, -apple-system, "Segoe UI", sans-serif;
   display: grid; grid-template-columns: minmax(0, 1fr) 390px; height: 100vh; overflow: hidden;
 }
 #map-wrap { position: relative; min-width: 0; }
@@ -104,7 +104,7 @@ th, td { text-align: left; padding: 5px 4px; border-bottom: 1px solid var(--hair
 td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
 .good { color: var(--good-text); font-weight: 800; }
 .star { width: 26px; height: 26px; cursor: default; filter: drop-shadow(0 1px 2px rgba(38,50,61,.45)); }
-.maplibregl-popup-content { border-radius: 12px; font: 13px Nunito, system-ui, sans-serif; color: var(--ink); padding: 8px 12px; }
+.maplibregl-popup-content { border-radius: 12px; font: 13px Montserrat, system-ui, sans-serif; color: var(--ink); padding: 8px 12px; }
 [hidden] { display: none !important; }
 @media (max-width: 800px) {
   body { display: block; height: auto; overflow: auto; }
@@ -508,7 +508,7 @@ document.addEventListener("keydown", e => {
 // Map
 function setupMap() {
   map = new maplibregl.Map({ container: "map", style: "https://tiles.openfreemap.org/styles/positron", center: [-119, 37], zoom: 4.6, attributionControl: { compact: false } });
-  map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+  map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");
   map.on("load", () => {
     const tint = { background: ["background-color", "#fbf4e4"], water: ["fill-color", "#bce6ee"], park: ["fill-color", "#d6efcb"], landcover_wood: ["fill-color", "#dcf0d0"], landuse_residential: ["fill-color", "#f8edd8"] };
     for (const [id, [prop, value]] of Object.entries(tint)) if (map.getLayer(id)) map.setPaintProperty(id, prop, value);
