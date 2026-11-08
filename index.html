@@ -56,6 +56,12 @@ body {
 #legend .ramp { height: 10px; border-radius: 5px; background: linear-gradient(90deg, var(--triggered), #bdb9ae, var(--background)); }
 #legend .ends { display: flex; justify-content: space-between; color: var(--ink-2); margin-top: 3px; }
 #legend .note { color: var(--ink-2); margin-top: 6px; }
+#legend .sym, #age-legend .sym { display: flex; gap: 6px; align-items: center; margin-top: 3px; }
+.sym i { width: 11px; height: 11px; border-radius: 50%; border: 0.5px solid #26323d; flex: none; }
+.sym svg { flex: none; margin: 0 -2px; }
+.magkey { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 7px; padding-top: 6px; border-top: 1px solid var(--hairline); }
+.magkey span { display: inline-flex; gap: 4px; align-items: center; }
+.magkey i { display: inline-block; border-radius: 50%; border: 0.5px solid #26323d; background: #fff; flex: none; }
 aside { background: var(--surface); overflow-y: auto; padding: 22px; box-shadow: -4px 0 18px rgba(38,50,61,.08); z-index: 3; }
 h1 { font-size: 23px; font-weight: 800; margin: 0 0 2px; }
 h2 { font-size: 17px; font-weight: 800; margin: 20px 0 8px; }
@@ -116,8 +122,26 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 4px 0; }
 .tile .lab { font-size: 13px; font-weight: 700; color: var(--ink-2); display: flex; gap: 6px; align-items: center; }
 .tile .num { font-size: 27px; font-weight: 800; line-height: 1.2; }
 .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: none; }
-.seg { display: flex; gap: 4px; margin-top: 6px; }
-.seg button { flex: 1; padding: 7px 4px; background: var(--page); color: var(--ink-2); }
+.fieldlab { font-weight: 700; font-size: 13px; margin-top: 6px; }
+.seg { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; margin-top: 4px; }
+.seg button { padding: 7px 2px; font-size: 12px; background: var(--page); color: var(--ink-2); }
+.seg button[data-show=none] { grid-column: 1 / -1; }
+.checks { margin-top: 10px; padding: 10px 12px; border-radius: 14px; background: var(--page); color: var(--ink); }
+.checks strong { display: block; font-size: 14px; margin-bottom: 2px; }
+.checks table { margin: 0; }
+.checks td { padding: 4px; }
+.checks tr:last-child td { border-bottom: 0; }
+.checks td.ck { width: 30px; text-align: center; font-weight: 800; }
+.ck.yes { color: var(--good-text); } .ck.no { color: #b3261e; } .ck.off { color: var(--muted); }
+.blob { margin-top: 10px; padding: 8px; border-radius: 14px; background: var(--accent-soft); }
+.blob-h { font-size: 13px; font-weight: 700; padding: 0 4px; }
+.blob .tiles3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.blob .tiles { margin-top: 6px; }
+.blob .tile { background: var(--surface); }
+.expected div { display: flex; gap: 18px; margin-top: 2px; }
+.expected b { font-size: 20px; font-weight: 800; }
+td.sym-p { font-family: "Cambria Math", "STIX Two Math", "Latin Modern Math", "Times New Roman", serif; font-style: italic; font-size: 19px; width: 24px; }
+.dl { margin-top: 6px; padding: 6px 12px; font-size: 13px; }
 .seg button[aria-pressed=true] { background: var(--accent); color: #fff; }
 #hist { position: relative; }
 #hist svg { display: block; width: 100%; height: auto; }
@@ -158,22 +182,25 @@ td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
   <div id="mock-pill">Mockup: all data here is made up</div>
   <div id="hint" role="status" hidden>Click to add corners. Click the first corner or press Enter to finish.</div>
   <div id="legend" hidden>
-    <strong>Chance of being an aftershock</strong>
-    <div class="sw"><i style="background:#15395b"></i>Above 0.9: aftershock</div>
-    <div class="sw"><i style="background:#6388c6"></i>0.1 to 0.9: uncertain</div>
-    <div class="sw"><i style="background:#d8dade"></i>Below 0.1: background</div>
+    <strong>P(aftershock)</strong>
+    <div class="sw"><i style="background:#15395b"></i>P &gt; 0.9: aftershock</div>
+    <div class="sw"><i style="background:#6388c6"></i>0.1 ≤ P ≤ 0.9: uncertain</div>
+    <div class="sw"><i style="background:#d8dade"></i>P &lt; 0.1: background</div>
+    <div class="sym"><svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M12 2.5l2.9 6.2 6.8.8-5 4.6 1.3 6.7-6-3.3-6 3.3 1.3-6.7-5-4.6 6.8-.8z" fill="#ffc93c" stroke="#26323d" stroke-width="1.6" stroke-linejoin="round"/></svg>3 largest inside</div>
+    <div class="sym"><i style="background:#c6c8c6;opacity:.4"></i>Outside your study</div>
+    <div class="magkey"></div>
     <div id="bg-legend" hidden>
       <strong style="margin-top:8px">Background rate</strong>
       <div class="ramp bilbao"></div>
       <div class="ends"><span id="bg-lo"></span><span id="bg-hi"></span></div>
       <div class="note" id="bg-unit"></div>
     </div>
-    <div class="note">Bigger circle, bigger magnitude. Faded: outside your study. Stars: the 3 largest inside.</div>
   </div>
   <div id="age-legend" hidden>
     <strong>Age</strong>
     <div id="age-rows"></div>
-    <div class="note">Bigger circle, bigger magnitude (USGS sizes).<span id="age-faded" hidden> Faded: outside your study.</span></div>
+    <div class="sym" id="age-faded" hidden><i style="background:#9a9a9a;opacity:.3"></i>Outside your study</div>
+    <div class="magkey"></div>
   </div>
   <div id="coords" hidden></div>
   <div id="event-card" hidden></div>
@@ -181,14 +208,14 @@ td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
 
 <aside>
   <h1>Quake Sorter</h1>
-  <p class="sub">Which earthquakes are background, and which were triggered by others?</p>
+  <p class="sub">Cozy website for lightning-fast stochastic earthquake declustering</p>
   <ol class="steps" aria-label="Progress">
     <li id="s-upload" tabindex="0">1 Upload</li><li id="s-area" tabindex="0">2 Area</li><li id="s-job" tabindex="0">3 Wait</li><li id="s-results" tabindex="0">4 Results</li>
   </ol>
 
-  <div class="notice" id="demo-banner" hidden>Demo: this copy of the site has no server, so it can't fit new
-    catalogues. Everything up to Process works with your own file (it stays in your browser), and stored fits
-    of the sample catalogue open below. To run fits, start <code>server.py</code> on your own computer (see the README).</div>
+  <div class="notice" id="demo-banner" hidden>Site demo warning: this GitHub Pages site is just 
+    a mockup to test UI as a personal project, with two example fits of Indonesian data below.
+     To run your own fits, start <code>server.py</code> on your own computer (see the README).</div>
   <section id="v-upload">
     <h2>Upload your catalogue</h2>
     <div class="drop" id="drop">
@@ -284,17 +311,26 @@ td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
 
   <section id="v-results" hidden>
     <h2>Results</h2>
+    <div class="checks" id="jit-checks"></div>
+    <div class="checks" id="checks"></div>
     <div id="fit-status"></div>
     <div id="res-body">
+      <div class="blob">
+      <div class="blob-h">Study events by P(aftershock): P &lt; 0.1, 0.1 ≤ P ≤ 0.9, P &gt; 0.9</div>
       <div class="tiles tiles3">
         <div class="tile"><div class="lab"><span class="dot" style="background:#d8dade;border:0.5px solid #26323d"></span>Background</div><div class="num" id="n-bg"></div><div class="small" id="pc-bg"></div></div>
         <div class="tile"><div class="lab"><span class="dot" style="background:#6388c6"></span>Uncertain</div><div class="num" id="n-unc"></div><div class="small" id="pc-unc"></div></div>
         <div class="tile"><div class="lab"><span class="dot" style="background:#15395b"></span>Aftershock</div><div class="num" id="n-aft"></div><div class="small" id="pc-aft"></div></div>
       </div>
-      <p class="small">By chance of being an aftershock: below 0.1, 0.1 to 0.9, above 0.9.
-        Expected numbers (sums of the probabilities): <b id="n-exp-bg"></b> background, <b id="n-exp-aft"></b> aftershocks.</p>
+      </div>
+      <div class="checks expected">
+        <strong>Expected numbers</strong>
+        <div><span><b id="n-exp-bg"></b> background</span><span><b id="n-exp-aft"></b> aftershocks</span></div>
+        <div class="small">Sums of the probabilities over the study events</div>
+      </div>
       <h3>Show on map</h3>
-      <div class="seg" role="group" aria-label="Show on map">
+      <div class="fieldlab" id="inc-lab">Study events</div>
+      <div class="seg" role="group" aria-labelledby="inc-lab">
         <button data-show="all" aria-pressed="true">All</button>
         <button data-show="bg" aria-pressed="false">Background</button>
         <button data-show="unc" aria-pressed="false">Uncertain</button>
@@ -303,8 +339,9 @@ td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
       </div>
       <label class="check"><input type="checkbox" id="show-outside" checked> Events outside your study (faded)</label>
       <label class="check" id="bg-toggle-row"><input type="checkbox" id="bg-toggle"> Background rate map <span class="small" id="bg-status"></span></label>
-      <h3>Events in your study by chance of being an aftershock</h3>
+      <h3>Histogram of event aftershock probability</h3>
       <div id="hist"><div id="tip" hidden></div></div>
+      <button class="dl" id="hist-dl">Download PNG</button>
       <details><summary class="small">Show as a table</summary><table id="hist-table"></table></details>
       <h3>Fitted parameters</h3>
       <table><tbody id="params"></tbody></table>
@@ -645,8 +682,20 @@ function refreshTargets() {
     "The fit will likely fail: turn on jitter for longitude and latitude above.";
 }
 
+// Legend circles at the map's own sizes (USGS table of the current zoom), for whole-magnitude
+// classes from the smallest event shown to the largest (at most 5, capped at the 7+ class).
+function magKey() {
+  const ms = state.step === "results" && R ? R.features.map(f => f.properties.m) : EVENTS.map(e => e.m);
+  if (!ms.length) return;
+  const z = map ? map.getZoom() : 0, d = USGS_DIAM[z < 5 ? 0 : z < 8 ? 1 : 2];
+  const hi = Math.min(7, Math.max(0, Math.floor(Math.max(...ms)))), lo = Math.max(0, Math.floor(Math.min(...ms)), hi - 4);
+  let html = "";
+  for (let k = lo; k <= hi; k++) html += `<span><i style="width:${d[k]}px;height:${d[k]}px"></i>M${k}${k === 7 ? "+" : ""}</span>`;
+  document.querySelectorAll(".magkey").forEach(el => { el.innerHTML = html; });
+}
 function paintEvents() {
   $("age-faded").hidden = !state.closed;
+  magKey();
   if (!state.loaded) return;
   const results = state.step === "results";
   const visible = state.step !== "job" && (results ? !!R : EVENTS.length > 0);
@@ -723,7 +772,7 @@ function showCard(f) {
     <tr><th>Depth</th><td>${d > -1e8 ? d.toFixed(1) + " km" : "not given"}</td></tr>`;
   if (state.step === "results") {
     const pa = +p.pa;
-    html += p.inT ? `<tr><th>Aftershock</th><td>${pa.toFixed(2)} chance: <b>${pa > 0.9 ? "aftershock" : pa < 0.1 ? "background" : "uncertain"}</b></td></tr>`
+    html += p.inT ? `<tr><th>P(aftershock)</th><td>${pa.toFixed(2)}: <b>${pa > 0.9 ? "aftershock" : pa < 0.1 ? "background" : "uncertain"}</b></td></tr>`
                   : `<tr><th>Study</th><td>Outside it (a possible trigger only)</td></tr>`;
   }
   const el = $("event-card");
@@ -867,6 +916,7 @@ let R = null;
 const DESCR = { mu: "Background rate scale", A: "Aftershock productivity", c: "Time offset, days",
   alpha: "Productivity vs magnitude", p: "Decay with time", D: "Spatial scale, km²", q: "Decay with distance",
   gamma: "Spatial scale vs magnitude", K: "Productivity (A undefined)" };
+const SYMBOL = { mu: "μ", alpha: "α", gamma: "γ" };      // others are their own letter
 const KM_PER_DEG = 111.195;
 
 function resultFeatures(r) {
@@ -912,13 +962,23 @@ function showResults(r) {
   state.closed = true;
   // Shown only if steqpy's checks pass AND p, q > 1 (site rule: steqpy's default K form allows
   // p or q <= 1, where A is undefined and the aftershock sequence has no finite size).
-  const f = r.fit, pq = r.params.p > 1 && r.params.q > 1, ok = f.valid && pq;
-  if (!pq) f.failed = [...f.failed, `p = ${(+r.params.p).toPrecision(3)} and q = ${(+r.params.q).toPrecision(3)} must both be above 1`];
+  const f = r.fit, failed = f.failed || [], p = +r.params.p, q = +r.params.q, ok = f.valid && p > 1 && q > 1;
+  // steqpy's failure messages (check_fit) mapped to rows; any other failure gets its own row
+  const has = k => failed.some(x => x.includes(k));
+  const known = ["not finite", "integral of lambda", "the kernel needs both above 1"];
+  $("checks").innerHTML = "<strong>Sanity checks</strong><table>" +
+    ckRow(`p &gt; 1 <span class="small">(${p.toPrecision(3)})</span>`, p > 1) +
+    ckRow(`q &gt; 1 <span class="small">(${q.toPrecision(3)})</span>`, q > 1) +
+    ckRow("Finite parameters and likelihood", !has("not finite")) +
+    ckRow("Integral of λ matches the event count", !has("integral of lambda")) +
+    failed.filter(x => !known.some(k => x.includes(k))).map(x => ckRow(esc(x), false)).join("") + "</table>";
+  const j = (r.request && r.request.jitter) || {}, jr = [["Longitude", j.lon, "°"], ["Latitude", j.lat, "°"], ["Time", j.t_s, " s"], ["Magnitude", j.mag, ""]];
+  $("jit-checks").innerHTML = `<strong>Jitter${jr.some(x => x[1]) ? ` <span class="small">(seed ${j.seed})</span>` : ""}</strong><table>` +
+    jr.map(([n, v, u]) => ckRow(n, !!v, `<td class="small">${!v ? "" : v === "precision" ? "± half its last decimal" : `± ${v}${u}`}</td>`, "off")).join("") + "</table>";
   $("fit-status").innerHTML = ok
-    ? `<p class="good">✓ The fit passed steqpy's checks (p and q above 1, finite values, integral matches the count)</p>` +
-      (f.converged === false ? `<div class="notice">⚠️ Not converged: the fit stopped at its iteration limit, so the numbers may still move a little.</div>` : "") +
+    ? (f.converged === false ? `<div class="notice">⚠️ Not converged: the fit stopped at its iteration limit, so the numbers may still move a little.</div>` : "") +
       (f.warnings.length ? `<div class="notice">⚠️ ${f.warnings.map(esc).join("<br>")}</div>` : "")
-    : `<div class="notice">✗ This fit is not a usable model, so no results are shown: ${f.failed.map(esc).join("; ")}.
+    : `<div class="notice">✗ This fit is not a usable model (see the checks above), so no results are shown.
        Common causes: the catalogue is incomplete for part of the period (try a later start date or a higher
        magnitude cutoff), or rounded locations without jitter. A larger area can also help.</div>`;
   $("res-body").hidden = !ok;
@@ -934,12 +994,10 @@ function showResults(r) {
     $("params").innerHTML = Object.entries(r.params).map(([k, v]) => {
       const scale = k === "D" ? KM_PER_DEG * KM_PER_DEG : 1, val = v === null ? "undefined" : (v * scale).toPrecision(4);
       const err = se[k] != null ? ` ± ${(se[k] * scale).toPrecision(2)}` : "";
-      return `<tr><td><b>${k}</b></td><td class="n">${val}${err}</td><td class="small">${DESCR[k] || ""}</td></tr>`;
+      return `<tr><td class="sym-p">${SYMBOL[k] || k}</td><td><b>${k}</b></td><td class="n">${val}${err}</td><td class="small">${DESCR[k] || ""}</td></tr>`;
     }).join("");
-    const jit = describeJitter(r.request && r.request.jitter);
-    $("params-note").textContent = (Object.keys(se).length
-      ? "± : standard errors from the Hessian (Wang, Schoenberg & Jackson 2010). They hold the background fixed, so they are too small. " : "")
-      + (jit ? `Jitter: ${jit}.` : "No jitter.");
+    $("params-note").textContent = Object.keys(se).length
+      ? "± : standard errors from the Hessian (Wang, Schoenberg & Jackson 2010). They hold the background fixed, so they are too small." : "";
   }
   $("bg-toggle").checked = false;
   $("bg-toggle-row").hidden = !r.projection;
@@ -955,9 +1013,38 @@ function showResults(r) {
   }
 }
 
+// A row of a checks box: label, then ✓ or ✗ (cross class "no": failed, "off": not used), then extra cells.
+function ckRow(label, ok, extra = "", cross = "no") {
+  return `<tr><td>${label}</td><td class="ck ${ok ? "yes" : cross}" aria-label="${ok ? "yes" : "no"}">${ok ? "✓" : "✗"}</td>${extra}</tr>`;
+}
+// Histogram as a PNG: the SVG drawn on a white canvas at 4x (Montserrat isn't available inside an
+// image, so the text falls back to Arial).
+function downloadHist() {
+  const svg = $("hist").querySelector("svg");
+  if (!svg) return;
+  const { width: W, height: H } = svg.viewBox.baseVal, S = 4, c = svg.cloneNode(true);
+  c.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+  c.setAttribute("width", W); c.setAttribute("height", H);
+  c.setAttribute("font-family", "Montserrat, Arial, sans-serif");
+  c.insertAdjacentHTML("afterbegin", `<rect width="${W}" height="${H}" fill="#fff"/>`);
+  const img = new Image();
+  img.onload = () => {
+    const cv = document.createElement("canvas");
+    cv.width = W * S; cv.height = H * S;
+    const g = cv.getContext("2d");
+    g.scale(S, S); g.drawImage(img, 0, 0);
+    cv.toBlob(b => {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(b); a.download = "histogram_p_aftershock.png"; a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    });
+  };
+  img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(new XMLSerializer().serializeToString(c));
+}
+
 function niceMax(v) { const m = Math.pow(10, Math.floor(Math.log10(v))); for (const k of [1, 2, 5, 10]) if (k * m >= v) return k * m; return v; }
 function drawHist(h) {
-  const BINS = h.counts.length, W = 346, H = 170, L = 38, Rm = 6, TOP = 18, B = 36, bins = h.counts;
+  const BINS = h.counts.length, W = 346, H = 170, L = 46, Rm = 6, TOP = 18, B = 36, bins = h.counts;
   const top = niceMax(Math.max(...bins, 1)), bw = (W - L - Rm) / BINS, y = v => H - B - v / top * (H - B - TOP), x = p => L + p * (W - L - Rm);
   let s = "";
   for (const f of [0, 0.5, 1]) {
@@ -973,10 +1060,11 @@ function drawHist(h) {
   });
   for (const b of [0.1, 0.9]) s += `<line x1="${x(b)}" x2="${x(b)}" y1="${TOP - 3}" y2="${y(0)}" stroke="#26323d" stroke-dasharray="3 3" pointer-events="none"/><text x="${x(b)}" y="${TOP - 6}" text-anchor="middle" font-size="10" fill="#26323d">${b}</text>`;
   for (const f of [0, 0.25, 0.5, 0.75, 1]) s += `<text x="${x(f)}" y="${H - B + 15}" text-anchor="middle" font-size="11" fill="#55616c">${f}</text>`;
-  s += `<text x="${(L + W - Rm) / 2}" y="${H - 3}" text-anchor="middle" font-size="11" fill="#55616c">Chance of being an aftershock</text>`;
+  s += `<text x="${(L + W - Rm) / 2}" y="${H - 3}" text-anchor="middle" font-size="11" fill="#55616c">P(aftershock)</text>`;
+  s += `<text transform="translate(10 ${(TOP + H - B) / 2}) rotate(-90)" text-anchor="middle" font-size="11" fill="#55616c">Events</text>`;
   const box = $("hist"), tip = $("tip");
   box.querySelector("svg")?.remove();
-  box.insertAdjacentHTML("afterbegin", `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Histogram of the chance of being an aftershock">${s}</svg>`);
+  box.insertAdjacentHTML("afterbegin", `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Histogram of P(aftershock)">${s}</svg>`);
   const svg = box.querySelector("svg");
   const label = i => `${h.edges[i].toFixed(2)} to ${h.edges[+i + 1].toFixed(2)}`;
   svg.addEventListener("mousemove", ev => {
@@ -990,7 +1078,7 @@ function drawHist(h) {
     tip.style.top = (r.top - b.top + 14) + "px";
   });
   svg.addEventListener("mouseleave", () => { tip.hidden = true; });
-  $("hist-table").innerHTML = "<thead><tr><th>Chance of being an aftershock</th><th class='n'>Events</th></tr></thead><tbody>" +
+  $("hist-table").innerHTML = "<thead><tr><th>P(aftershock)</th><th class='n'>Events</th></tr></thead><tbody>" +
     bins.map((c, i) => `<tr><td>${label(i)}</td><td class="n">${fmt(c)}</td></tr>`).join("") + "</tbody>";
 }
 
@@ -1167,6 +1255,7 @@ document.querySelectorAll("#jitter-box input, #jitter-box select").forEach(el =>
 $("process").onclick = () => API ? startRealJob() : DEMO_HOST ? demoProcess() : startJob();
 $("bg-toggle").addEventListener("change", e => showBackground(e.target.checked));
 $("show-outside").addEventListener("change", paintEvents);
+$("hist-dl").onclick = downloadHist;
 $("copy").onclick = async () => { try { await navigator.clipboard.writeText(location.href); $("copy").textContent = "Copied"; } catch { $("copy").textContent = "Select it"; } };
 document.querySelectorAll(".seg button").forEach(b => b.onclick = () => {
   state.show = b.dataset.show;
@@ -1204,6 +1293,7 @@ function setupMap() {
     map.addLayer({ id: "area-line", type: "line", source: "area", filter: ["!=", ["geometry-type"], "Point"], paint: { "line-color": "#5a55c8", "line-width": 2.5 } });
     map.addLayer({ id: "area-dots", type: "circle", source: "area", filter: ["==", ["geometry-type"], "Point"], paint: { "circle-radius": 6, "circle-color": "#fffdf8", "circle-stroke-color": "#5a55c8", "circle-stroke-width": 2.5 } });
     state.loaded = true;
+    map.on("zoomend", magKey);
     refreshTargets();
     setResultData();
     paintArea();
@@ -1234,7 +1324,7 @@ function setupMap() {
     let html = `<b>M${(+f.m).toFixed(1)}</b>, ${dateOf(+f.t)}`;
     if (state.step === "results" && f.inT) {
       const pa = +f.pa, cls = pa > 0.9 ? "Aftershock" : pa < 0.1 ? "Background" : "Uncertain";
-      html += `<br>Chance of being an aftershock: ${pa.toFixed(2)}<br><b>${cls}</b>`;
+      html += `<br>P(aftershock): ${pa.toFixed(2)}<br><b>${cls}</b>`;
     }
     else if (state.step === "results") html += "<br>Outside your study";
     popup.setLngLat(e.lngLat).setHTML(html).addTo(map);
