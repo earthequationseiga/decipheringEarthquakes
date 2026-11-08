@@ -1,12 +1,15 @@
 # Quake Sorter
 
-A website where people upload an earthquake catalogue, draw a study area on a map, and get stochastic declustering results: fitted parameters, background and triggered counts at a chosen probability cutoff, a histogram, and a map of event probabilities.
+A website where people upload an earthquake catalogue, draw a study area on a map, and get stochastic declustering results: fitted parameters, how many events are certain background, uncertain or certain aftershocks, a histogram of each event's chance of being an aftershock, and maps of the events and of the background rate.
 
-**Status: clickable mockup.** Uploading a real catalogue works (it is read and checked in the browser), but there is no backend or declustering yet: the results are made up.
+**Status: local prototype.** Upload, polygon drawing and results work; with `server.py` the fits are real (run on your own machine). Not hosted yet.
 
 ## Try it
 
-Open `index.html` in a browser. It needs an internet connection for the map library, map tiles and font.
+- Mockup (made-up results): open `index.html` in a browser.
+- Real fits on your own machine: run `python server.py` with the Python environment that has [`steqpy`](../stochastic_declustering_improvement)'s dependencies (numpy, numba), then open http://127.0.0.1:8765/. Each run is kept in `jobs/` (catalogue, polygon, steqpy config, results).
+
+Both need an internet connection for the map library, map tiles and font.
 
 Desktop browsers only: drawing the study area needs a computer.
 

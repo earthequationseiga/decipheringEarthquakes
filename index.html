@@ -71,8 +71,18 @@ button:disabled { background: var(--hairline); color: var(--muted); cursor: not-
 .filebtn:focus-within { outline: 3px solid var(--accent); outline-offset: 2px; }
 .filebtn input { position: absolute; width: 1px; height: 1px; opacity: 0; }
 #coords { position: absolute; right: 10px; bottom: 58px; z-index: 2; background: rgba(255,253,248,.9); border-radius: 8px; padding: 2px 8px; font-size: 12px; font-variant-numeric: tabular-nums; pointer-events: none; }
-#age-legend .sw { display: flex; gap: 6px; align-items: center; margin-top: 3px; }
-#age-legend .sw i { width: 11px; height: 11px; border-radius: 50%; border: 0.5px solid #26323d; flex: none; }
+#age-legend .sw, #legend .sw { display: flex; gap: 6px; align-items: center; margin-top: 3px; }
+#age-legend .sw i, #legend .sw i { width: 11px; height: 11px; border-radius: 50%; border: 0.5px solid #26323d; flex: none; }
+#legend .ramp.bilbao { background: linear-gradient(90deg, #ffffff, #eaeaea, #d7d7d3, #cac7bc, #c2bca6, #bbb291, #b5a57c, #ae956d, #aa8665, #a67960, #a26b59, #9d5c52, #934b47, #843938, #732726, #601516, #4d0001); border: 0.5px solid var(--axis); }
+.tiles.tiles3 { grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+.tiles3 .tile { padding: 10px 8px; }
+.tiles3 .num { font-size: 22px; }
+#jitter-box { margin-top: 10px; }
+#jitter-box summary { font-weight: 700; color: var(--ink); }
+table.jit td { padding: 4px 3px; border: 0; font-size: 13px; vertical-align: middle; }
+table.jit select { font: inherit; font-size: 12px; padding: 4px; border: 1px solid var(--axis); border-radius: 8px; background: #fff; }
+table.jit input[type=number] { width: 78px; margin: 0; padding: 4px 6px; }
+label.check { display: flex; gap: 8px; align-items: center; font-weight: 700; margin-top: 10px; cursor: pointer; }
 code { font: 12px ui-monospace, Consolas, monospace; background: var(--page); padding: 2px 5px; border-radius: 6px; overflow-wrap: anywhere; }
 .report { margin: 12px 0 0; padding: 0; list-style: none; }
 .report li { padding: 8px 10px; border-radius: 10px; margin-top: 6px; background: var(--page); }
@@ -137,10 +147,17 @@ td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
   <div id="mock-pill">Mockup: all data here is made up</div>
   <div id="hint" role="status" hidden>Click to add corners. Click the first corner or press Enter to finish.</div>
   <div id="legend" hidden>
-    <strong>Chance of being background</strong>
-    <div class="ramp"></div>
-    <div class="ends"><span>0 triggered</span><span>1 background</span></div>
-    <div class="note">Bigger dot, bigger magnitude. Grey dots are outside your study. Stars mark the 3 largest inside.</div>
+    <strong>Chance of being an aftershock</strong>
+    <div class="sw"><i style="background:#15395b"></i>Above 0.9: aftershock</div>
+    <div class="sw"><i style="background:#6388c6"></i>0.1 to 0.9: uncertain</div>
+    <div class="sw"><i style="background:#d8dade"></i>Below 0.1: background</div>
+    <div id="bg-legend" hidden>
+      <strong style="margin-top:8px">Background rate</strong>
+      <div class="ramp bilbao"></div>
+      <div class="ends"><span id="bg-lo"></span><span id="bg-hi"></span></div>
+      <div class="note" id="bg-unit"></div>
+    </div>
+    <div class="note">Bigger circle, bigger magnitude. Faded: outside your study. Stars: the 3 largest inside.</div>
   </div>
   <div id="age-legend" hidden>
     <strong>Age</strong>
@@ -172,6 +189,14 @@ td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
     <div id="report" hidden>
       <h2>File check</h2>
       <ul class="report" id="report-list"></ul>
+      <div id="mc-fig" hidden>
+        <h3>Events and completeness over time</h3>
+        <div id="mc-plot"></div>
+        <p class="small">Bars: events per 3 months (left axis, log scale). Dots: completeness magnitude Mc (right axis), every
+          3 months from the 6 months before, by the coefficient-of-variation method of Godano, Petrillo &amp; Lippiello
+          (2023, GJI 236, 994–1001). No dot: fewer than 50 events in that window. Choose a magnitude at or above
+          Mc for the whole period you fit: below it, missing small events look like changes in seismicity.</p>
+      </div>
       <button class="primary" id="to-area">Continue</button>
     </div>
   </section>
@@ -189,6 +214,38 @@ td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
     </div>
     <label>Smallest magnitude<input type="number" id="mc" value="3" step="0.1"></label>
     <p class="small" id="mc-note" hidden></p>
+    <details id="jitter-box">
+      <summary class="small">Jitter rounded values <span id="jit-state">(off)</span></summary>
+      <p class="small">Rounded values put events at exactly the same place or time, which the model reads as
+        extreme clustering. Jitter adds random noise of up to ± the width below, before the cuts. The same seed
+        gives the same noise, so a run can be repeated exactly.</p>
+      <table class="jit"><tbody>
+        <tr><td><input type="checkbox" id="j-lon-on" aria-label="Jitter longitude"></td><td>Longitude</td>
+          <td><select id="j-lon-mode"><option value="precision">± half its last decimal</option><option value="fixed">± fixed</option></select></td>
+          <td><input type="number" id="j-lon" min="0" step="any" aria-label="Longitude half-width"> °</td></tr>
+        <tr><td><input type="checkbox" id="j-lat-on" aria-label="Jitter latitude"></td><td>Latitude</td>
+          <td><select id="j-lat-mode"><option value="precision">± half its last decimal</option><option value="fixed">± fixed</option></select></td>
+          <td><input type="number" id="j-lat" min="0" step="any" aria-label="Latitude half-width"> °</td></tr>
+        <tr><td><input type="checkbox" id="j-mag-on" aria-label="Jitter magnitude"></td><td>Magnitude</td>
+          <td><select id="j-mag-mode"><option value="precision">± half its last decimal</option><option value="fixed">± fixed</option></select></td>
+          <td><input type="number" id="j-mag" min="0" step="any" aria-label="Magnitude half-width"></td></tr>
+        <tr><td><input type="checkbox" id="j-t-on" aria-label="Jitter time"></td><td>Time</td><td>± fixed</td>
+          <td><input type="number" id="j-t" min="0" step="any" aria-label="Time half-width in seconds"> s</td></tr>
+      </tbody></table>
+      <label>Seed<input type="number" id="j-seed" value="1" min="0" step="1"></label>
+      <p class="small">"Half its last decimal": 129.75 gets ± 0.005°, 129.7 gets ± 0.05° (as R's ETAS package does).
+        A value that happens to end in 0 counts as coarser: 129.0 gets ± 0.5°. The fixed widths start at half
+        the catalogue's most common precision.</p>
+    </details>
+    <div class="notice" id="dup-note" role="status" hidden></div>
+    <details id="fit-box">
+      <summary class="small">Fit settings</summary>
+      <label>Most outer iterations<input type="number" id="max-outer" value="11" min="1" max="100" step="1"></label>
+      <p class="small">Each outer iteration re-estimates the background, then the parameters. A good fit usually
+        settles in under 10; if it reports "not converged", more iterations can finish it (each costs about one fit pass).</p>
+      <label class="check"><input type="checkbox" id="hessian"> Standard errors from the Hessian</label>
+      <p class="small">Approximate: they hold the background fixed, so they are too small.</p>
+    </details>
     <div class="count"><b id="n-in">0</b> events in your study
       <div class="small">Events outside it are still used as possible triggers.</div>
     </div>
@@ -203,38 +260,51 @@ td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
     <h3>Come back any time</h3>
     <p class="small">This page updates by itself. You can also close it and return with this link:</p>
     <div class="link"><code id="link"></code><button id="copy">Copy</button></div>
-    <p class="small">Sped up for this mockup. A real run takes minutes.</p>
+    <p class="small" id="mock-note">Sped up for this mockup. A real run takes minutes.</p>
   </section>
 
   <section id="v-results" hidden>
     <h2>Results</h2>
-    <p class="good">✓ Fit looks valid: p and q are both above 1</p>
-    <div class="cut" style="margin-top:12px"><label for="cut" style="margin:0">Probability cutoff</label><output id="cut-out"></output></div>
-    <input type="range" id="cut" min="0" max="1" step="0.05" value="0.5">
-    <div class="tiles">
-      <div class="tile"><div class="lab"><span class="dot" style="background:var(--background)"></span>Background</div><div class="num" id="n-bg"></div><div class="small" id="pc-bg"></div></div>
-      <div class="tile"><div class="lab"><span class="dot" style="background:var(--triggered)"></span>Triggered</div><div class="num" id="n-tr"></div><div class="small" id="pc-tr"></div></div>
+    <div id="fit-status"></div>
+    <div id="res-body">
+      <div class="tiles tiles3">
+        <div class="tile"><div class="lab"><span class="dot" style="background:#d8dade;border:0.5px solid #26323d"></span>Background</div><div class="num" id="n-bg"></div><div class="small" id="pc-bg"></div></div>
+        <div class="tile"><div class="lab"><span class="dot" style="background:#6388c6"></span>Uncertain</div><div class="num" id="n-unc"></div><div class="small" id="pc-unc"></div></div>
+        <div class="tile"><div class="lab"><span class="dot" style="background:#15395b"></span>Aftershock</div><div class="num" id="n-aft"></div><div class="small" id="pc-aft"></div></div>
+      </div>
+      <p class="small">By chance of being an aftershock: below 0.1, 0.1 to 0.9, above 0.9.
+        Expected numbers (sums of the probabilities): <b id="n-exp-bg"></b> background, <b id="n-exp-aft"></b> aftershocks.</p>
+      <h3>Show on map</h3>
+      <div class="seg" role="group" aria-label="Show on map">
+        <button data-show="all" aria-pressed="true">All</button>
+        <button data-show="bg" aria-pressed="false">Background</button>
+        <button data-show="unc" aria-pressed="false">Uncertain</button>
+        <button data-show="aft" aria-pressed="false">Aftershock</button>
+        <button data-show="none" aria-pressed="false">None</button>
+      </div>
+      <label class="check"><input type="checkbox" id="show-outside" checked> Events outside your study (faded)</label>
+      <label class="check" id="bg-toggle-row"><input type="checkbox" id="bg-toggle"> Background rate map <span class="small" id="bg-status"></span></label>
+      <h3>Events in your study by chance of being an aftershock</h3>
+      <div id="hist"><div id="tip" hidden></div></div>
+      <details><summary class="small">Show as a table</summary><table id="hist-table"></table></details>
+      <h3>Fitted parameters</h3>
+      <table><tbody id="params"></tbody></table>
+      <p class="small" id="params-note"></p>
     </div>
-    <p class="small">Expected background: <b id="n-exp"></b> events. This sums every probability, so the cutoff doesn't change it.</p>
-    <h3>Show on map</h3>
-    <div class="seg" role="group" aria-label="Show on map">
-      <button data-show="all" aria-pressed="true">All</button>
-      <button data-show="background" aria-pressed="false">Background</button>
-      <button data-show="triggered" aria-pressed="false">Triggered</button>
-    </div>
-    <h3>Events in your study by probability</h3>
-    <div class="key"><span><span class="dot" style="background:var(--triggered)"></span>Below cutoff</span><span><span class="dot" style="background:var(--background)"></span>At or above cutoff</span></div>
-    <div id="hist"><div id="tip" hidden></div></div>
-    <details><summary class="small">Show as a table</summary><table id="hist-table"></table></details>
-    <h3>Fitted parameters</h3>
-    <table><tbody id="params"></tbody></table>
     <button id="restart" style="margin-top:16px">Start again</button>
   </section>
 </aside>
 
 <script>
 "use strict";
-const TEAL = "#009b94", CORAL = "#ee5a45", MID = "#bdb9ae", OUTSIDE = "#c6c8c6";
+const OUTSIDE = "#c6c8c6";
+// Results classes by P(aftershock) = 1 - P(background), steqpy's summary bands; colours from
+// Crameri's Oslo (dark blue end = aftershock, middle = uncertain, light end = background).
+const C_AFT = "#15395b", C_UNC = "#6388c6", C_BG = "#d8dade";
+// Crameri's Bilbao, 17 stops, light to dark red: background-rate map on a log scale.
+const BILBAO = ["#ffffff", "#eaeaea", "#d7d7d3", "#cac7bc", "#c2bca6", "#bbb291", "#b5a57c", "#ae956d", "#aa8665",
+  "#a67960", "#a26b59", "#9d5c52", "#934b47", "#843938", "#732726", "#601516", "#4d0001"];
+const API = location.protocol.startsWith("http");     // served by server.py: real fits on this machine
 const T0 = Date.UTC(1990, 0, 1), DAY = 864e5, SPAN = 13149; // sample catalogue: 36 years in days
 // USGS Latest Earthquakes markers (their app's getMarkerSize / getMarkerColor): circle diameter in
 // px per whole-magnitude class 0..7+, one table per zoom range (< 5, 5-7, >= 8); age colours.
@@ -381,6 +451,77 @@ function suggestMc(events) {
   return best / 10 + 0.2;
 }
 
+// Decimals of a number as printed (trailing zeros gone), like steqpy's readers.decimals.
+function jsDecimals(v) {
+  const [mant, exp] = String(v).toLowerCase().split("e");
+  return Math.max((mant.split(".")[1] || "").replace(/0+$/, "").length - (exp ? +exp : 0), 0);
+}
+// Jitter settings for the request (steqpy's jitter_*): 0 = off, "precision", or a half-width.
+function jitterSettings() {
+  const col = k => !$(`j-${k}-on`).checked ? 0 : $(`j-${k}-mode`).value === "precision" ? "precision" : Math.max(+$(`j-${k}`).value || 0, 0);
+  return { lon: col("lon"), lat: col("lat"), mag: col("mag"), t_s: $("j-t-on").checked ? Math.max(+$("j-t").value || 0, 0) : 0,
+    seed: Math.max(Math.floor(+$("j-seed").value || 0), 0) };
+}
+function describeJitter(j) {
+  if (!j) return "";
+  const parts = [["longitude", j.lon, "°"], ["latitude", j.lat, "°"], ["magnitude", j.mag, ""]].filter(p => p[1])
+    .map(([n, v, u]) => v === "precision" ? `${n} ± half its last decimal` : `${n} ± ${v}${u}`);
+  if (j.t_s) parts.push(`time ± ${j.t_s} s`);
+  return parts.length ? `${parts.join(", ")}, seed ${j.seed}` : "";
+}
+
+// Completeness magnitude by the coefficient of variation (Godano, Petrillo & Lippiello 2023,
+// GJI 236, 994-1001): above Mc the magnitude excesses m - m_th are exponential (Gutenberg-
+// Richter), whose CV = std / mean is 1; below Mc missing small events make CV < 1. The paper
+// reads the saturation off plots; automated here (our choice): Mc = the smallest threshold, in
+// steps of the magnitude bin dm, with at least MC_NMIN events and CV >= 1 - max(0.05, 1/sqrt(n))
+// (allows for sampling noise). Excesses measured from m_th - dm/2 (binned magnitudes).
+const MC_NMIN = 50;
+function cvMc(mags, dm) {
+  const m = Float64Array.from(mags).sort();
+  if (m.length < MC_NMIN) return NaN;
+  for (let k = 0, mth = Math.round(m[0] / dm) * dm; mth < m[m.length - 1]; mth = Math.round((mth + dm) / dm) * dm) {
+    while (k < m.length && m[k] < mth - 1e-9) k++;
+    const n = m.length - k;
+    if (n < MC_NMIN) return NaN;
+    let s = 0, s2 = 0;
+    for (let i = k; i < m.length; i++) { const x = m[i] - (mth - dm / 2); s += x; s2 += x * x; }
+    const mean = s / n, sd = Math.sqrt(Math.max(s2 - n * mean * mean, 0) / (n - 1));
+    if (sd / mean >= 1 - Math.max(0.05, 1 / Math.sqrt(n))) return +mth.toFixed(6);
+  }
+  return NaN;
+}
+// Events per 3 months, and Mc every 3 months from the 6 months before.
+function completenessSeries(events) {
+  const QUARTER = 365.25 / 4 * DAY, t = events.map(e => e.t), t0 = Math.min(...t), t1 = Math.max(...t);
+  // magnitude bin: the finest of 1, 0.1, 0.01 that the magnitudes use
+  const decs = [0, 1, 2].filter(d => events.some(e => jsDecimals(e.m) === d)), dm = 10 ** -(decs.length ? Math.max(...decs) : 2);
+  const nb = Math.max(1, Math.ceil((t1 - t0) / QUARTER)), counts = new Array(nb).fill(0), bins = Array.from({ length: nb }, () => []);
+  for (const e of events) { const b = Math.min(Math.floor((e.t - t0) / QUARTER), nb - 1); counts[b]++; bins[b].push(e.m); }
+  const mc = [];
+  for (let b = 1; b < nb; b++) mc.push({ t: t0 + (b + 1) * QUARTER, mc: cvMc([...bins[b - 1], ...bins[b]], dm) });
+  return { t0, QUARTER, counts, mc, dm };
+}
+function drawCompleteness(events) {
+  const s = completenessSeries(events), W = 346, H = 200, L = 40, Rr = 34, TOP = 10, B = 26;
+  const t1 = s.t0 + s.counts.length * s.QUARTER, x = t => L + (t - s.t0) / (t1 - s.t0) * (W - L - Rr);
+  // counts on a log axis (1 .. next power of 10): one big sequence would flatten everything else
+  const dec = Math.max(1, Math.ceil(Math.log10(Math.max(...s.counts, 1)))), yc = v => H - B - Math.log10(Math.max(v, 1)) / dec * (H - B - TOP);
+  const mcs = s.mc.map(p => p.mc).filter(v => isFinite(v)), mlo = Math.floor(Math.min(...mcs, 0)), mhi = Math.ceil(Math.max(...mcs, 1));
+  const ym = v => H - B - (v - mlo) / (mhi - mlo || 1) * (H - B - TOP);
+  let g = "";
+  for (let k = 0; k <= dec; k++) g += `<line x1="${L}" x2="${W - Rr}" y1="${yc(10 ** k)}" y2="${yc(10 ** k)}" stroke="${k ? "#eae4d6" : "#cfc8b8"}"/><text x="${L - 5}" y="${yc(10 ** k) + 4}" text-anchor="end" font-size="10" fill="#55616c">${fmt(10 ** k)}</text>`;
+  s.counts.forEach((c, b) => { const x0 = x(s.t0 + b * s.QUARTER), w = Math.max((W - L - Rr) / s.counts.length - 0.5, 0.5); if (c) g += `<rect x="${x0}" y="${yc(c)}" width="${w}" height="${yc(0) - yc(c)}" fill="#cfc8b8"/>`; });
+  for (let v = mlo; v <= mhi; v += Math.max(1, Math.round((mhi - mlo) / 4))) g += `<text x="${W - Rr + 5}" y="${ym(v) + 4}" font-size="10" fill="#5a55c8">${v}</text>`;
+  for (const p of s.mc) if (isFinite(p.mc)) g += `<circle cx="${x(p.t)}" cy="${ym(p.mc)}" r="2.2" fill="#5a55c8"><title>${dateOf(p.t)}: Mc ${p.mc.toFixed(1)}</title></circle>`;
+  const y0 = new Date(s.t0).getUTCFullYear(), y1 = new Date(t1).getUTCFullYear(), step = Math.max(1, Math.ceil((y1 - y0) / 6 / 5) * 5);
+  for (let y = Math.ceil(y0 / step) * step; y <= y1; y += step) { const xx = x(Date.UTC(y, 0, 1)); if (xx >= L && xx <= W - Rr) g += `<text x="${xx}" y="${H - B + 14}" text-anchor="middle" font-size="10" fill="#55616c">${y}</text>`; }
+  g += `<text x="12" y="${(H - B + TOP) / 2}" font-size="10" fill="#55616c" transform="rotate(-90 12 ${(H - B + TOP) / 2})" text-anchor="middle">events / 3 months</text>`;
+  g += `<text x="${W - 6}" y="${(H - B + TOP) / 2}" font-size="10" fill="#5a55c8" transform="rotate(90 ${W - 6} ${(H - B + TOP) / 2})" text-anchor="middle">Mc</text>`;
+  $("mc-plot").innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Events per 3 months and completeness magnitude over time">${g}</svg>`;
+  $("mc-fig").hidden = false;
+}
+
 // A new catalogue: keep its events, set the study dates to its time span, show it whole.
 function loadEvents(events) {
   EVENTS = events;
@@ -397,6 +538,11 @@ function loadEvents(events) {
   $("mc-note").hidden = false;
   $("mc-note").textContent = `Suggested ${mc.toFixed(1)}: below this the catalogue is likely incomplete ` +
     `(most common magnitude + 0.2, over the whole file). Change it if you know better.`;
+  // Jitter defaults: half the most common precision of each column (time: of the seconds).
+  const modeOf = arr => { const c = new Map(); for (const v of arr) c.set(v, (c.get(v) || 0) + 1); let best = 0, k = -1; for (const [v, n] of c) if (n > k) { best = v; k = n; } return best; };
+  const halfStep = d => String(+(0.5 * 10 ** -d).toPrecision(3));
+  for (const [id, key] of [["j-lon", "lon"], ["j-lat", "lat"], ["j-mag", "m"]]) $(id).value = halfStep(modeOf(events.map(e => jsDecimals(e[key]))));
+  $("j-t").value = halfStep(modeOf(events.map(e => { const ms = ((e.t % 1000) + 1000) % 1000; return ms === 0 ? 0 : ms % 100 === 0 ? 1 : ms % 10 === 0 ? 2 : 3; })));
   $("age-rows").innerHTML = [...AGE_COLORS].reverse().map((c, i) => {
     const k = 4 - i, lo = k ? ageEdges[k - 1] : t0, hi = k < 4 ? ageEdges[k] : t1;
     return `<div class="sw"><i style="background:${c}"></i>${dateOf(lo)} to ${dateOf(hi)}</div>`;
@@ -405,7 +551,7 @@ function loadEvents(events) {
   fullView();
 }
 
-let state = { step: "upload", corners: [], drawing: false, closed: false, cutoff: 0.5, show: "all", loaded: false };
+let state = { step: "upload", corners: [], drawing: false, closed: false, show: "all", loaded: false };
 let targets = [], stars = [], jobTimer = null, cursor = null;
 let map = null;
 
@@ -436,7 +582,7 @@ function refreshTargets() {
     const age = ageEdges.filter(x => e.t > x).length;      // 0 = oldest fifth .. 4 = newest
     return { type: "Feature", geometry: { type: "Point", coordinates: [e.lon, e.lat] }, properties: { m: e.m, p: e.p, t: e.t, age, inT: inT ? 1 : 0 } };
   });
-  if (state.loaded) map.getSource("events").setData({ type: "FeatureCollection", features });
+  if (state.loaded && state.step !== "results") map.getSource("events").setData({ type: "FeatureCollection", features });
   $("n-in").textContent = fmt(targets.length);
   const note = $("area-note");
   note.hidden = true;
@@ -445,25 +591,38 @@ function refreshTargets() {
     note.textContent = `⚠️ Only ${fmt(targets.length)} ${targets.length === 1 ? "event" : "events"}. With so few, the fit may not be reliable. Try a larger area, a longer period or a smaller magnitude.`;
   }
   $("process").disabled = !state.closed || targets.length === 0;
+  // Events at exactly the same place make the likelihood unbounded (spatial scale -> 0).
+  const jit = jitterSettings(), seen = new Map();
+  $("jit-state").textContent = describeJitter(jit) ? "(on)" : "(off)";
+  let dups = 0, used = 0;
+  if (state.closed) {
+    for (const e of EVENTS) if (e.m >= mc && e.t < to) { used++; const k = e.lon + "," + e.lat; seen.set(k, (seen.get(k) || 0) + 1); }
+    for (const n of seen.values()) if (n > 1) dups += n;
+  }
+  $("dup-note").hidden = !(dups && !(jit.lon && jit.lat));
+  $("dup-note").textContent = `⚠️ ${fmt(dups)} of the ${fmt(used)} events used share an exact location with another event (rounded coordinates). ` +
+    "The fit will likely fail: turn on jitter for longitude and latitude above.";
 }
 
 function paintEvents() {
   $("age-faded").hidden = !state.closed;
   if (!state.loaded) return;
-  const visible = state.step !== "job" && EVENTS.length > 0;
-  map.setLayoutProperty("events", "visibility", visible ? "visible" : "none");
   const results = state.step === "results";
-  // Before results: USGS age colours; once a study is drawn, events outside it are faded.
+  const visible = state.step !== "job" && (results ? !!R : EVENTS.length > 0);
+  map.setLayoutProperty("events", "visibility", visible ? "visible" : "none");
+  // Before results: USGS age colours. Results: Oslo classes by P(aftershock) ("pa").
+  // Once a study is drawn, events outside it are faded.
+  const pa = ["get", "pa"];
   map.setPaintProperty("events", "circle-color", results
-    ? ["case", ["==", ["get", "inT"], 1], ["interpolate", ["linear"], ["get", "p"], 0, CORAL, 0.5, MID, 1, TEAL], OUTSIDE]
+    ? ["case", ["==", ["get", "inT"], 0], OUTSIDE, [">", pa, 0.9], C_AFT, ["<", pa, 0.1], C_BG, C_UNC]
     : ["match", ["get", "age"], 0, AGE_COLORS[0], 1, AGE_COLORS[1], 2, AGE_COLORS[2], 3, AGE_COLORS[3], AGE_COLORS[4]]);
-  const faded = state.closed ? (results ? 0.45 : 0.2) : 1;
-  map.setPaintProperty("events", "circle-opacity", ["case", ["==", ["get", "inT"], 1], results ? 0.85 : 1, faded]);
+  const faded = state.closed ? (results ? 0.3 : 0.2) : 1;
+  map.setPaintProperty("events", "circle-opacity", ["case", ["==", ["get", "inT"], 1], 1, faded]);
   map.setPaintProperty("events", "circle-stroke-opacity", ["case", ["==", ["get", "inT"], 1], 1, faded]);
-  let filter = null;
-  if (results && state.show === "background") filter = ["any", ["==", ["get", "inT"], 0], [">=", ["get", "p"], state.cutoff]];
-  if (results && state.show === "triggered") filter = ["any", ["==", ["get", "inT"], 0], ["<", ["get", "p"], state.cutoff]];
-  map.setFilter("events", filter);
+  if (!results) return map.setFilter("events", null);
+  const keep = { all: true, bg: ["<", pa, 0.1], unc: ["all", [">=", pa, 0.1], ["<=", pa, 0.9]], aft: [">", pa, 0.9], none: false }[state.show];
+  const inside = ["all", ["==", ["get", "inT"], 1], keep], outside = $("show-outside").checked ? ["==", ["get", "inT"], 0] : false;
+  map.setFilter("events", ["any", inside, outside]);
 }
 
 function paintArea() {
@@ -490,9 +649,8 @@ function setStep(step) {
 function placeStars() {
   stars.forEach(s => s.remove());
   stars = [];
-  if (state.step !== "results" || !map) return;
-  // EVENTS is sorted by magnitude, so the last targets are the largest.
-  for (const e of targets.slice(-3)) {
+  if (state.step !== "results" || !map || !R) return;
+  for (const e of R.stars) {
     const el = document.createElement("div");
     el.className = "star";
     el.title = `M${e.m.toFixed(1)}, ${dateOf(e.t)}`;
@@ -553,88 +711,303 @@ function useExample() {
   if (map) map.fitBounds([[-119.2, 34.8], [-116, 36.6]], { padding: 40, duration: 600 });
 }
 
-// The polling pattern, faked: the page keeps asking how the job is doing until it is done.
+// -- Jobs ------------------------------------------------------------------------------------
+// Served by server.py (API): the page sends the catalogue and study, then polls until the fit is
+// done. Opened as a file: the old made-up job and results, so the layout can still be judged.
 const JOB_STEPS = [["📥", "Queued, 2 ahead of you", 3], ["🔎", "Reading your catalogue", 2], ["⚙️", "Fitting the model", 6], ["📊", "Preparing results", 2]];
 function startJob() {
   history.replaceState(null, "", "#/jobs/" + JOB_ID);
   $("link").textContent = location.href.split("#")[0].split("/").pop() + "#/jobs/" + JOB_ID;
   setStep("job");
-  let elapsed = 0, lastCheck = 0;
+  let elapsed = 0;
   const total = JOB_STEPS.reduce((a, s) => a + s[2], 0);
   const draw = () => {
     let t = elapsed, now = JOB_STEPS.length - 1;
     for (let i = 0; i < JOB_STEPS.length; i++) { if (t < JOB_STEPS[i][2]) { now = i; break; } t -= JOB_STEPS[i][2]; }
-    $("job-list").innerHTML = JOB_STEPS.map(([icon, text], i) => {
-      const label = i === 2 && i === now ? `Fitting the model, step ${Math.min(1 + Math.floor(t / JOB_STEPS[2][2] * 11), 11)} of 11` : text;
-      return `<li class="${i === now ? "now" : i < now ? "past" : ""}"><span aria-hidden="true">${i < now ? "✅" : icon}</span>${label}</li>`;
-    }).join("");
-    $("job-title").textContent = now === 0 ? "Your catalogue is in the queue" : "Working on your catalogue";
-    $("checked").textContent = `Checked ${elapsed - lastCheck === 0 ? "just now" : (elapsed - lastCheck) + " s ago"}`;
+    drawJobSteps(JOB_STEPS.map(s => [s[0], s[1]]), now);
   };
   draw();
   jobTimer = setInterval(() => {
     elapsed++;
-    if (elapsed % 3 === 0) lastCheck = elapsed;
-    if (elapsed >= total) { clearInterval(jobTimer); showResults(); } else draw();
+    if (elapsed >= total) { clearInterval(jobTimer); showResults(fakeResult()); } else draw();
   }, 1000);
 }
+function drawJobSteps(steps, now) {
+  $("job-list").innerHTML = steps.map(([icon, text], i) =>
+    `<li class="${i === now ? "now" : i < now ? "past" : ""}"><span aria-hidden="true">${i < now ? "✅" : icon}</span>${esc(text)}</li>`).join("");
+  $("job-title").textContent = now === 0 ? "Your catalogue is in the queue" : "Working on your catalogue";
+}
 
-// Results
-const PARAMS = [["mu", "0.62", "Background rate scale"], ["A", "0.31", "Aftershock productivity"], ["c", "0.021", "Time offset, days"], ["alpha", "1.35", "Productivity vs magnitude"],
-  ["p", "1.14", "Decay with time"], ["D", "0.0012", "Spatial scale"], ["q", "1.85", "Decay with distance"], ["gamma", "1.02", "Spatial scale vs magnitude"]];
-function showResults() {
-  $("params").innerHTML = PARAMS.map(([n, v, d]) => `<tr><td><b>${n}</b></td><td class="n">${v}</td><td class="small">${d}</td></tr>`).join("");
-  $("n-exp").textContent = fmt(Math.round(targets.reduce((a, e) => a + e.p, 0)));
+async function startRealJob() {
+  $("process").disabled = true;
+  const ev = EVENTS;
+  const body = { events: { lon: ev.map(e => e.lon), lat: ev.map(e => e.lat), t: ev.map(e => e.t), m: ev.map(e => e.m) },
+    polygon: state.corners, from_ms: dateMs("from"), to_ms: dateMs("to"), mc: +$("mc").value, jitter: jitterSettings(),
+    max_outer: Math.min(Math.max(Math.round(+$("max-outer").value || 11), 1), 100), hessian: $("hessian").checked };
+  try {
+    const r = await fetch("jobs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
+    history.replaceState(null, "", "#/jobs/" + d.id);
+    pollJob(d.id);
+  } catch (err) {
+    $("area-note").hidden = false;
+    $("area-note").textContent = `⚠️ Couldn't start the fit: ${err.message}`;
+    $("process").disabled = false;
+  }
+}
+function pollJob(id) {
+  setStep("job");
+  $("link").textContent = location.href;
+  $("mock-note").hidden = true;
+  const tick = async () => {
+    let s;
+    try { const r = await fetch("jobs/" + id); s = await r.json(); if (!r.ok) s = { state: "failed", message: s.error || `HTTP ${r.status}` }; }
+    catch { s = { state: "retry" }; }
+    if (s.state === "done") {
+      drawJobSteps([["📥", "Queued"], ["⚙️", "Fitting the model"], ["📊", "Preparing results"]], 2);
+      try { showResults(await (await fetch(`jobs/${id}/result`)).json()); }
+      catch (err) { $("checked").textContent = `Couldn't read the result: ${err.message}`; }
+      return;
+    }
+    if (s.state === "failed") {
+      $("job-title").textContent = "The fit could not be run";
+      $("job-list").innerHTML = `<li class="now"><span aria-hidden="true">⚠️</span>${esc(s.message)}</li>`;
+      $("checked").textContent = "";
+      return;
+    }
+    if (s.state === "retry") $("checked").textContent = "Can't reach the server, trying again…";
+    else {
+      const queued = s.state === "queued";
+      drawJobSteps([["📥", queued && s.position > 1 ? `Queued, ${s.position - 1} ahead of you` : "Queued"],
+        ["⚙️", queued ? "Fitting the model" : s.message], ["📊", "Preparing results"]], queued ? 0 : 1);
+      $("checked").textContent = "Checks every 2 seconds";
+    }
+    jobTimer = setTimeout(tick, 2000);
+  };
+  tick();
+}
+
+// -- Results ---------------------------------------------------------------------------------
+// R is steqpy's result.json (see DeclusteringResult.to_dict) plus the server's "request".
+let R = null;
+const DESCR = { mu: "Background rate scale", A: "Aftershock productivity", c: "Time offset, days",
+  alpha: "Productivity vs magnitude", p: "Decay with time", D: "Spatial scale, km²", q: "Decay with distance",
+  gamma: "Spatial scale vs magnitude", K: "Productivity (A undefined)" };
+const KM_PER_DEG = 111.195;
+
+function resultFeatures(r) {
+  const e = r.events, t0 = r.request ? r.request.t0_ms : 0, mc = e.mag_cutoff || 0;
+  const f = e.lon.map((lon, i) => ({ type: "Feature", geometry: { type: "Point", coordinates: [lon, e.lat[i]] },
+    properties: { m: e.mag_above_cutoff[i] + mc, t: t0 + e.t_days[i] * DAY, pa: 1 - (e.p_background[i] ?? 1), inT: e.target[i] } }));
+  return f.sort((a, b) => a.properties.m - b.properties.m);       // largest drawn on top
+}
+function setResultData() {
+  if (state.loaded && R) map.getSource("events").setData({ type: "FeatureCollection", features: R.features });
+}
+
+// A made-up result in the same shape, for the page opened as a file.
+function fakeResult() {
+  const mc = +$("mc").value, inT = new Set(targets), pa = targets.map(e => 1 - e.p);
+  const edges = Array.from({ length: 21 }, (_, i) => i / 20), counts = new Array(20).fill(0);
+  for (const v of pa) counts[Math.min(Math.floor(v * 20), 19)]++;
+  return {
+    fit: { valid: true, failed: [], warnings: [], converged: true },
+    params: { mu: 0.62, A: 0.31, c: 0.021, alpha: 1.35, p: 1.14, D: 0.0012, q: 1.85, gamma: 1.02 }, errors: {},
+    summary: { n_targets: pa.length, certain_background: pa.filter(v => v < 0.1).length, uncertain: pa.filter(v => v >= 0.1 && v <= 0.9).length,
+      certain_aftershock: pa.filter(v => v > 0.9).length, expected_background: pa.reduce((a, v) => a + 1 - v, 0),
+      expected_aftershocks: pa.reduce((a, v) => a + v, 0), histogram_p_aftershock: { edges, counts } },
+    events: { lon: EVENTS.map(e => e.lon), lat: EVENTS.map(e => e.lat), t_days: EVENTS.map(e => e.t / DAY), mag_cutoff: mc,
+      mag_above_cutoff: EVENTS.map(e => e.m - mc), target: EVENTS.map(e => inT.has(e) ? 1 : 0), p_background: EVENTS.map(e => e.p) },
+    region: { polygon: state.corners }, projection: null, request: { t0_ms: 0 } };
+}
+
+function showResults(r) {
+  R = r;
+  if (API) $("mock-pill").textContent = "Local server: real fit on this machine";
+  R.features = resultFeatures(r);
+  R.stars = R.features.filter(f => f.properties.inT).slice(-3).map(f => ({ lon: f.geometry.coordinates[0], lat: f.geometry.coordinates[1], m: f.properties.m, t: f.properties.t }));
+  const poly = r.region.polygon.map(p => [p[0], p[1]]);
+  if (poly.length > 3 && poly[0][0] === poly.at(-1)[0] && poly[0][1] === poly.at(-1)[1]) poly.pop();   // steqpy closes rings
+  state.corners = poly;
+  state.closed = true;
+  // Shown only if steqpy's checks pass AND p, q > 1 (site rule: steqpy's default K form allows
+  // p or q <= 1, where A is undefined and the aftershock sequence has no finite size).
+  const f = r.fit, pq = r.params.p > 1 && r.params.q > 1, ok = f.valid && pq;
+  if (!pq) f.failed = [...f.failed, `p = ${(+r.params.p).toPrecision(3)} and q = ${(+r.params.q).toPrecision(3)} must both be above 1`];
+  $("fit-status").innerHTML = ok
+    ? `<p class="good">✓ The fit passed steqpy's checks (p and q above 1, finite values, integral matches the count)</p>` +
+      (f.converged === false ? `<div class="notice">⚠️ Not converged: the fit stopped at its iteration limit, so the numbers may still move a little.</div>` : "") +
+      (f.warnings.length ? `<div class="notice">⚠️ ${f.warnings.map(esc).join("<br>")}</div>` : "")
+    : `<div class="notice">✗ This fit is not a usable model, so no results are shown: ${f.failed.map(esc).join("; ")}.
+       Common causes: the catalogue is incomplete for part of the period (try a later start date or a higher
+       magnitude cutoff), or rounded locations without jitter. A larger area can also help.</div>`;
+  $("res-body").hidden = !ok;
+  if (ok) {
+    const s = r.summary, n = s.n_targets, pc = v => `${(100 * v / n).toFixed(1)}% of ${fmt(n)}`;
+    $("n-bg").textContent = fmt(s.certain_background); $("pc-bg").textContent = pc(s.certain_background);
+    $("n-unc").textContent = fmt(s.uncertain); $("pc-unc").textContent = pc(s.uncertain);
+    $("n-aft").textContent = fmt(s.certain_aftershock); $("pc-aft").textContent = pc(s.certain_aftershock);
+    $("n-exp-bg").textContent = fmt(Math.round(s.expected_background));
+    $("n-exp-aft").textContent = fmt(Math.round(s.expected_aftershocks));
+    drawHist(s.histogram_p_aftershock);
+    const se = (r.errors && r.errors.hessian) || {};
+    $("params").innerHTML = Object.entries(r.params).map(([k, v]) => {
+      const scale = k === "D" ? KM_PER_DEG * KM_PER_DEG : 1, val = v === null ? "undefined" : (v * scale).toPrecision(4);
+      const err = se[k] != null ? ` ± ${(se[k] * scale).toPrecision(2)}` : "";
+      return `<tr><td><b>${k}</b></td><td class="n">${val}${err}</td><td class="small">${DESCR[k] || ""}</td></tr>`;
+    }).join("");
+    const jit = describeJitter(r.request && r.request.jitter);
+    $("params-note").textContent = (Object.keys(se).length
+      ? "± : standard errors from the Hessian (Wang, Schoenberg & Jackson 2010). They hold the background fixed, so they are too small. " : "")
+      + (jit ? `Jitter: ${jit}.` : "No jitter.");
+  }
+  $("bg-toggle").checked = false;
+  $("bg-toggle-row").hidden = !r.projection;
+  $("bg-status").textContent = "";
+  if (state.loaded && map.getLayer("bgrate")) map.setLayoutProperty("bgrate", "visibility", "none");
   setStep("results");
-  drawResults();
+  setResultData();
+  paintArea();
+  if (map && poly.length) {
+    const lons = poly.map(p => p[0]), lats = poly.map(p => p[1]);
+    const go = () => map.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]], { padding: 40, duration: 600 });
+    state.loaded ? go() : map.once("load", go);
+  }
 }
-function drawResults() {
-  const n = targets.length, bg = targets.filter(e => e.p >= state.cutoff).length;
-  $("cut-out").textContent = state.cutoff.toFixed(2);
-  $("n-bg").textContent = fmt(bg);
-  $("n-tr").textContent = fmt(n - bg);
-  $("pc-bg").textContent = `${(100 * bg / n).toFixed(1)}% of ${fmt(n)}`;
-  $("pc-tr").textContent = `${(100 * (n - bg) / n).toFixed(1)}% of ${fmt(n)}`;
-  drawHist();
-  paintEvents();
-}
+
 function niceMax(v) { const m = Math.pow(10, Math.floor(Math.log10(v))); for (const k of [1, 2, 5, 10]) if (k * m >= v) return k * m; return v; }
-function drawHist() {
-  const BINS = 20, W = 346, H = 170, L = 38, R = 6, TOP = 18, B = 36, bins = new Array(BINS).fill(0);
-  for (const e of targets) bins[Math.min(Math.floor(e.p * BINS), BINS - 1)]++;
-  const top = niceMax(Math.max(...bins, 1)), bw = (W - L - R) / BINS, y = v => H - B - v / top * (H - B - TOP), x = p => L + p * (W - L - R);
+function drawHist(h) {
+  const BINS = h.counts.length, W = 346, H = 170, L = 38, Rm = 6, TOP = 18, B = 36, bins = h.counts;
+  const top = niceMax(Math.max(...bins, 1)), bw = (W - L - Rm) / BINS, y = v => H - B - v / top * (H - B - TOP), x = p => L + p * (W - L - Rm);
   let s = "";
   for (const f of [0, 0.5, 1]) {
     const v = top * f;
-    s += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="${f ? "#eae4d6" : "#cfc8b8"}"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="#55616c">${fmt(v)}</text>`;
+    s += `<line x1="${L}" x2="${W - Rm}" y1="${y(v)}" y2="${y(v)}" stroke="${f ? "#eae4d6" : "#cfc8b8"}"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="#55616c">${fmt(v)}</text>`;
   }
   bins.forEach((c, i) => {
-    const lo = i / BINS, px = x(lo) + 1, w = bw - 2, h = Math.max(y(0) - y(c), c ? 1 : 0), r = Math.min(4, w / 2, h);
-    const fill = lo + 1e-9 >= state.cutoff ? TEAL : CORAL;
-    if (h) s += `<path d="M${px} ${y(0)}V${y(0) - h + r}Q${px} ${y(0) - h} ${px + r} ${y(0) - h}H${px + w - r}Q${px + w} ${y(0) - h} ${px + w} ${y(0) - h + r}V${y(0)}Z" fill="${fill}"/>`;
+    const lo = h.edges[i], mid = (h.edges[i] + h.edges[i + 1]) / 2, px = x(lo) + 1, w = bw - 2;
+    const hh = Math.max(y(0) - y(c), c ? 1 : 0), r = Math.min(4, w / 2, hh);
+    const fill = mid > 0.9 ? C_AFT : mid < 0.1 ? C_BG : C_UNC;
+    if (hh) s += `<path d="M${px} ${y(0)}V${y(0) - hh + r}Q${px} ${y(0) - hh} ${px + r} ${y(0) - hh}H${px + w - r}Q${px + w} ${y(0) - hh} ${px + w} ${y(0) - hh + r}V${y(0)}Z" fill="${fill}" stroke="#26323d" stroke-width="0.5"/>`;
     s += `<rect x="${x(lo)}" y="${TOP}" width="${bw}" height="${H - B - TOP}" fill="transparent" data-i="${i}"/>`;
   });
+  for (const b of [0.1, 0.9]) s += `<line x1="${x(b)}" x2="${x(b)}" y1="${TOP - 3}" y2="${y(0)}" stroke="#26323d" stroke-dasharray="3 3" pointer-events="none"/><text x="${x(b)}" y="${TOP - 6}" text-anchor="middle" font-size="10" fill="#26323d">${b}</text>`;
   for (const f of [0, 0.25, 0.5, 0.75, 1]) s += `<text x="${x(f)}" y="${H - B + 15}" text-anchor="middle" font-size="11" fill="#55616c">${f}</text>`;
-  s += `<text x="${(L + W - R) / 2}" y="${H - 3}" text-anchor="middle" font-size="11" fill="#55616c">Probability of being background</text>`;
-  const cx = x(state.cutoff), anchor = state.cutoff > 0.8 ? "end" : state.cutoff < 0.2 ? "start" : "middle";
-  s += `<line x1="${cx}" x2="${cx}" y1="${TOP - 3}" y2="${y(0)}" stroke="#26323d" stroke-width="2" pointer-events="none"/><text x="${cx}" y="${TOP - 7}" text-anchor="${anchor}" font-size="11" font-weight="800" fill="#26323d">cutoff ${state.cutoff.toFixed(2)}</text>`;
+  s += `<text x="${(L + W - Rm) / 2}" y="${H - 3}" text-anchor="middle" font-size="11" fill="#55616c">Chance of being an aftershock</text>`;
   const box = $("hist"), tip = $("tip");
   box.querySelector("svg")?.remove();
-  box.insertAdjacentHTML("afterbegin", `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Histogram of the probability of being background, for ${fmt(targets.length)} events">${s}</svg>`);
+  box.insertAdjacentHTML("afterbegin", `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Histogram of the chance of being an aftershock">${s}</svg>`);
   const svg = box.querySelector("svg");
+  const label = i => `${h.edges[i].toFixed(2)} to ${h.edges[+i + 1].toFixed(2)}`;
   svg.addEventListener("mousemove", ev => {
     const i = ev.target.dataset && ev.target.dataset.i;
     if (i === undefined) { tip.hidden = true; return; }
     const r = ev.target.getBoundingClientRect(), b = box.getBoundingClientRect();
     tip.hidden = false;
-    tip.textContent = `${(i / BINS).toFixed(2)} to ${((+i + 1) / BINS).toFixed(2)}: ${fmt(bins[i])} events`;
+    tip.textContent = `${label(i)}: ${fmt(bins[i])} events`;
     const half = tip.offsetWidth / 2;
     tip.style.left = Math.max(half, Math.min(r.left - b.left + r.width / 2, b.width - half)) + "px";
     tip.style.top = (r.top - b.top + 14) + "px";
   });
   svg.addEventListener("mouseleave", () => { tip.hidden = true; });
-  $("hist-table").innerHTML = "<thead><tr><th>Probability</th><th class='n'>Events</th></tr></thead><tbody>" +
-    bins.map((c, i) => `<tr><td>${(i / BINS).toFixed(2)} to ${((i + 1) / BINS).toFixed(2)}</td><td class="n">${fmt(c)}</td></tr>`).join("") + "</tbody>";
+  $("hist-table").innerHTML = "<thead><tr><th>Chance of being an aftershock</th><th class='n'>Events</th></tr></thead><tbody>" +
+    bins.map((c, i) => `<tr><td>${label(i)}</td><td class="n">${fmt(c)}</td></tr>`).join("") + "</tbody>";
+}
+
+// -- Background-rate map, computed in the browser --------------------------------------------
+// mu * u(x) = mu / T * sum_j phi_j exp(-r^2 / (2 h_j^2)) / (2 pi h_j^2), r in steqpy's model
+// coordinates (laea at the polygon centroid, or flat), Gaussian cut at 6 h_j (relative error
+// ~1e-8; checked against steqpy's rates.dat to 2e-6, its print precision). Grid rows are spaced
+// evenly in Web Mercator, so the image lines up with the map. Runs in a Web Worker.
+const BG_WORKER = `
+const RAD = Math.PI / 180, R0 = 180 / Math.PI;
+onmessage = ({ data: d }) => {
+  const s0 = Math.sin(d.lat0 * RAD), c0 = Math.cos(d.lat0 * RAD), cf = Math.cos(d.lat0 * RAD);
+  const proj = d.kind === "flat" ? (lon, lat) => [lon * cf, lat] : (lon, lat) => {
+    const lam = (lon - d.lon0) * RAD, ph = lat * RAD, sp = Math.sin(ph), cp = Math.cos(ph), cl = Math.cos(lam);
+    const k = Math.sqrt(2 / (1 + s0 * sp + c0 * cp * cl));
+    return [R0 * k * cp * Math.sin(lam), R0 * k * (c0 * sp - s0 * cp * cl)];
+  };
+  const merc = lat => Math.log(Math.tan(Math.PI / 4 + lat * RAD / 2)), yN = merc(d.n), yS = merc(d.s);
+  const nx = d.nx, ny = d.ny, colLon = i => d.w + (d.e - d.w) * (i + 0.5) / nx;
+  const rowLat = r => Math.atan(Math.sinh(yN - (yN - yS) * (r + 0.5) / ny)) * R0;
+  const gx = new Float64Array(nx * ny), gy = new Float64Array(nx * ny), out = new Float64Array(nx * ny);
+  for (let r = 0; r < ny; r++) for (let i = 0; i < nx; i++) { const [x, y] = proj(colLon(i), rowLat(r)); gx[r * nx + i] = x; gy[r * nx + i] = y; }
+  const rowOf = lat => (yN - merc(Math.max(-85, Math.min(85, lat)))) / (yN - yS) * ny - 0.5;
+  for (let j = 0; j < d.lon.length; j++) {
+    const h = d.h[j], rc = 6 * h, rc2 = rc * rc, w = d.phi[j] / (2 * Math.PI * h * h), inv = -0.5 / (h * h);
+    const [xj, yj] = proj(d.lon[j], d.lat[j]);
+    const la = rc * 1.1, lo = la / Math.max(Math.cos(d.lat[j] * RAD), 0.05);
+    const i0 = Math.max(0, Math.floor((d.lon[j] - lo - d.w) / (d.e - d.w) * nx - 0.5)), i1 = Math.min(nx - 1, Math.ceil((d.lon[j] + lo - d.w) / (d.e - d.w) * nx - 0.5));
+    const r0 = Math.max(0, Math.floor(rowOf(d.lat[j] + la))), r1 = Math.min(ny - 1, Math.ceil(rowOf(d.lat[j] - la)));
+    for (let r = r0; r <= r1; r++) for (let i = i0; i <= i1; i++) {
+      const c = r * nx + i, dx = gx[c] - xj, dy = gy[c] - yj, d2 = dx * dx + dy * dy;
+      if (d2 < rc2) out[c] += w * Math.exp(d2 * inv);
+    }
+  }
+  postMessage(out, [out.buffer]);
+};`;
+let bgWorker = null;
+function hexRgb(h) { return [1, 3, 5].map(k => parseInt(h.slice(k, k + 2), 16)); }
+const BILBAO_RGB = BILBAO.map(hexRgb);
+function bilbao(f) {                  // f in [0, 1] -> [r, g, b]
+  const x = Math.min(Math.max(f, 0), 1) * (BILBAO_RGB.length - 1), k = Math.min(Math.floor(x), BILBAO_RGB.length - 2), u = x - k;
+  return BILBAO_RGB[k].map((v, c) => Math.round(v + (BILBAO_RGB[k + 1][c] - v) * u));
+}
+function showBackground(on) {
+  if (!state.loaded || !R || !R.projection) return;
+  if (map.getLayer("bgrate")) map.setLayoutProperty("bgrate", "visibility", on ? "visible" : "none");
+  $("bg-legend").hidden = !on || !R.bg;
+  if (!on || R.bg || R.bgBusy) return;
+  R.bgBusy = true;
+  $("bg-status").textContent = "computing…";
+  const poly = state.corners, lons = poly.map(p => p[0]), lats = poly.map(p => p[1]);
+  let w = Math.min(...lons), e = Math.max(...lons), s = Math.min(...lats), n = Math.max(...lats);
+  const pw = (e - w) * 0.1, ph = (n - s) * 0.1;
+  w -= pw; e += pw; s = Math.max(-84, s - ph); n = Math.min(84, n + ph);
+  const merc = lat => Math.log(Math.tan(Math.PI / 4 + lat * Math.PI / 360));
+  const aspect = (merc(n) - merc(s)) / ((e - w) * Math.PI / 180), MAXN = 400;
+  const nx = aspect > 1 ? Math.round(MAXN / aspect) : MAXN, ny = aspect > 1 ? MAXN : Math.round(MAXN * aspect);
+  const ev = R.events, t0 = performance.now();
+  if (!bgWorker) bgWorker = new Worker(URL.createObjectURL(new Blob([BG_WORKER], { type: "text/javascript" })));
+  bgWorker.onmessage = ({ data: out }) => {
+    const toUnit = R.background.mu / R.background.T_days * 365.25 * 1e4 / (KM_PER_DEG * KM_PER_DEG);  // events / yr / 10,000 km^2
+    // colour range (log scale): max inside the polygon down to its 5th percentile, at most 4 decades
+    const inside = [];
+    const mercY = lat => merc(lat), yN = mercY(n), yS = mercY(s);
+    for (let r = 0; r < ny; r++) {
+      const lat = Math.atan(Math.sinh(yN - (yN - yS) * (r + 0.5) / ny)) * 180 / Math.PI;
+      for (let i = 0; i < nx; i++) if (inPoly(w + (e - w) * (i + 0.5) / nx, lat, poly)) inside.push(out[r * nx + i] * toUnit);
+    }
+    inside.sort((a, b) => a - b);
+    const hi = inside.at(-1) || 1, lo = Math.max(inside[Math.floor(inside.length * 0.05)] || 0, hi * 1e-4);
+    const cv = document.createElement("canvas");
+    cv.width = nx; cv.height = ny;
+    const ctx = cv.getContext("2d"), img = ctx.createImageData(nx, ny), L0 = Math.log10(lo), L1 = Math.log10(hi);
+    for (let c = 0; c < out.length; c++) {
+      const v = out[c] * toUnit;
+      if (v < lo) continue;                                   // below the range: transparent
+      const [rr, gg, bb] = bilbao((Math.log10(v) - L0) / (L1 - L0));
+      img.data.set([rr, gg, bb, 220], 4 * c);
+    }
+    ctx.putImageData(img, 0, 0);
+    const coordinates = [[w, n], [e, n], [e, s], [w, s]];
+    if (map.getSource("bgrate")) map.getSource("bgrate").updateImage({ url: cv.toDataURL(), coordinates });
+    else {
+      map.addSource("bgrate", { type: "image", url: cv.toDataURL(), coordinates });
+      map.addLayer({ id: "bgrate", type: "raster", source: "bgrate", paint: { "raster-opacity": 0.85, "raster-resampling": "linear", "raster-fade-duration": 0 } }, "events");
+    }
+    R.bg = { lo, hi };
+    R.bgBusy = false;
+    const sci = v => v >= 0.01 && v < 1000 ? v.toPrecision(2) : v.toExponential(1);
+    $("bg-lo").textContent = sci(lo); $("bg-hi").textContent = sci(hi);
+    $("bg-unit").textContent = `M ≥ ${R.events.mag_cutoff} background events per year per 10,000 km², log scale`;
+    $("bg-status").textContent = `(${nx} × ${ny} grid, ${Math.round(performance.now() - t0)} ms)`;
+    showBackground($("bg-toggle").checked);
+  };
+  bgWorker.postMessage({ lon: ev.lon, lat: ev.lat, phi: ev.p_background, h: ev.bandwidth, kind: R.projection.kind,
+    lon0: R.projection.lon0, lat0: R.projection.lat0, w, e, s, n, nx, ny });
 }
 
 // Fit the view to all events (their bounding box; centred on its middle).
@@ -649,8 +1022,11 @@ function fullView() {
 function useCatalogue(r, source) {
   showReport(r, source);
   loadEvents(r.events);
+  $("mc-fig").hidden = true;
+  if (r.events.length) drawCompleteness(r.events);
   setStep("upload");
-  $("mock-pill").textContent = source ? "Mockup: your events are real, the results are made up" : "Mockup: all data here is made up";
+  $("mock-pill").textContent = API ? (source ? "Local server: real fits on this machine" : "Sample catalogue (made up), fitted for real")
+    : source ? "Mockup: your events are real, the results are made up" : "Mockup: all data here is made up";
   $("example").hidden = !!source;          // the Ridgecrest polygon only fits the sample
 }
 async function readFile(file) {
@@ -670,9 +1046,11 @@ $("draw").onclick = startDrawing;
 $("example").onclick = useExample;
 $("clear").onclick = clearArea;
 for (const id of ["from", "to", "mc"]) $(id).addEventListener("change", () => { refreshTargets(); paintEvents(); });
-$("process").onclick = startJob;
+document.querySelectorAll("#jitter-box input, #jitter-box select").forEach(el => el.addEventListener("change", refreshTargets));
+$("process").onclick = () => API ? startRealJob() : startJob();
+$("bg-toggle").addEventListener("change", e => showBackground(e.target.checked));
+$("show-outside").addEventListener("change", paintEvents);
 $("copy").onclick = async () => { try { await navigator.clipboard.writeText(location.href); $("copy").textContent = "Copied"; } catch { $("copy").textContent = "Select it"; } };
-$("cut").addEventListener("input", e => { state.cutoff = +e.target.value; drawResults(); });
 document.querySelectorAll(".seg button").forEach(b => b.onclick = () => {
   state.show = b.dataset.show;
   document.querySelectorAll(".seg button").forEach(o => o.setAttribute("aria-pressed", o === b));
@@ -711,6 +1089,7 @@ function setupMap() {
     map.addLayer({ id: "area-dots", type: "circle", source: "area", filter: ["==", ["geometry-type"], "Point"], paint: { "circle-radius": 6, "circle-color": "#fffdf8", "circle-stroke-color": "#5a55c8", "circle-stroke-width": 2.5 } });
     state.loaded = true;
     refreshTargets();
+    setResultData();
     paintArea();
     paintEvents();
     placeStars();
@@ -732,7 +1111,10 @@ function setupMap() {
     map.getCanvas().style.cursor = "pointer";
     const f = e.features[0].properties;
     let html = `<b>M${(+f.m).toFixed(1)}</b>, ${dateOf(+f.t)}`;
-    if (state.step === "results" && f.inT) html += `<br>Chance of being background: ${(+f.p).toFixed(2)}<br>${+f.p >= state.cutoff ? "Background" : "Triggered"} at this cutoff`;
+    if (state.step === "results" && f.inT) {
+      const pa = +f.pa, cls = pa > 0.9 ? "Aftershock" : pa < 0.1 ? "Background" : "Uncertain";
+      html += `<br>Chance of being an aftershock: ${pa.toFixed(2)}<br><b>${cls}</b>`;
+    }
     else if (state.step === "results") html += "<br>Outside your study";
     popup.setLngLat(e.lngLat).setHTML(html).addTo(map);
   });
@@ -742,14 +1124,15 @@ function setupMap() {
 if (window.maplibregl) setupMap();
 else { $("mock-pill").textContent = "The map library didn't load. Check your connection."; }
 
-// Opening a job link goes straight to its state, here always a finished job.
-if (location.hash.startsWith("#/jobs/")) {
+// Opening a job link goes straight to its state: polled from the server, or (opened as a
+// file) a made-up finished job.
+if (location.hash.startsWith("#/jobs/") && API) pollJob(location.hash.slice(7));
+else if (location.hash.startsWith("#/jobs/")) {
   loadEvents(makeEvents());
   state.corners = RIDGECREST.map(v => [...v]);
   state.closed = true;
   refreshTargets();
-  showResults();
-  if (map) map.once("load", () => { map.fitBounds([[-119.2, 34.8], [-116, 36.6]], { padding: 40, duration: 0 }); });
+  showResults(fakeResult());
 } else setStep("upload");
 </script>
 </body>
