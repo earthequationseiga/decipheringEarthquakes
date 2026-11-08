@@ -141,6 +141,9 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 4px 0; }
 .expected div { display: flex; gap: 18px; margin-top: 2px; }
 .expected b { font-size: 20px; font-weight: 800; }
 td.sym-p { font-family: "Cambria Math", "STIX Two Math", "Latin Modern Math", "Times New Roman", serif; font-style: italic; font-size: 19px; width: 24px; }
+.indent { margin-left: 26px; }
+#bg-status:empty { display: none; }
+label.check.radio { font-weight: 600; font-size: 13px; margin-top: 6px; }
 .dl { margin-top: 6px; padding: 6px 12px; font-size: 13px; }
 .seg button[aria-pressed=true] { background: var(--accent); color: #fff; }
 #hist { position: relative; }
@@ -192,7 +195,7 @@ td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
     <div id="bg-legend" hidden>
       <strong style="margin-top:8px">Background rate</strong>
       <div class="ramp bilbao"></div>
-      <div class="ends"><span id="bg-lo"></span><span id="bg-hi"></span></div>
+      <div class="ends" id="bg-ticks"></div>
       <div class="note" id="bg-unit"></div>
     </div>
   </div>
@@ -338,7 +341,18 @@ td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
         <button data-show="none" aria-pressed="false">None</button>
       </div>
       <label class="check"><input type="checkbox" id="show-outside" checked> Events outside your study (faded)</label>
-      <label class="check" id="bg-toggle-row"><input type="checkbox" id="bg-toggle"> Background rate map <span class="small" id="bg-status"></span></label>
+      <div id="bg-toggle-row">
+        <label class="check"><input type="checkbox" id="bg-toggle"> Background rate map</label>
+        <div class="small indent" id="bg-status"></div>
+        <div class="indent" id="bg-opts" hidden>
+          <div class="row" role="radiogroup" aria-label="Colour scale">
+            <label class="check radio"><input type="radio" name="bg-scale" id="bg-log" checked> Log scale</label>
+            <label class="check radio"><input type="radio" name="bg-scale" id="bg-lin"> Linear scale</label>
+          </div>
+          <label for="bg-min">Show rates above: <output id="bg-min-out">all</output></label>
+          <input type="range" id="bg-min" min="0" max="1000" value="0">
+        </div>
+      </div>
       <h3>Histogram of event aftershock probability</h3>
       <div id="hist"><div id="tip" hidden></div></div>
       <button class="dl" id="hist-dl">Download PNG</button>
@@ -1000,6 +1014,8 @@ function showResults(r) {
       ? "± : standard errors from the Hessian (Wang, Schoenberg & Jackson 2010). They hold the background fixed, so they are too small." : "";
   }
   $("bg-toggle").checked = false;
+  $("bg-opts").hidden = true;
+  $("bg-min").value = 0;
   $("bg-toggle-row").hidden = !r.projection;
   $("bg-status").textContent = "";
   if (state.loaded && map.getLayer("bgrate")) map.setLayoutProperty("bgrate", "visibility", "none");
@@ -1061,7 +1077,7 @@ function drawHist(h) {
   for (const b of [0.1, 0.9]) s += `<line x1="${x(b)}" x2="${x(b)}" y1="${TOP - 3}" y2="${y(0)}" stroke="#26323d" stroke-dasharray="3 3" pointer-events="none"/><text x="${x(b)}" y="${TOP - 6}" text-anchor="middle" font-size="10" fill="#26323d">${b}</text>`;
   for (const f of [0, 0.25, 0.5, 0.75, 1]) s += `<text x="${x(f)}" y="${H - B + 15}" text-anchor="middle" font-size="11" fill="#55616c">${f}</text>`;
   s += `<text x="${(L + W - Rm) / 2}" y="${H - 3}" text-anchor="middle" font-size="11" fill="#55616c">P(aftershock)</text>`;
-  s += `<text transform="translate(10 ${(TOP + H - B) / 2}) rotate(-90)" text-anchor="middle" font-size="11" fill="#55616c">Events</text>`;
+  s += `<text transform="translate(10 ${(TOP + H - B) / 2}) rotate(-90)" text-anchor="middle" font-size="11" fill="#55616c">Counts</text>`;
   const box = $("hist"), tip = $("tip");
   box.querySelector("svg")?.remove();
   box.insertAdjacentHTML("afterbegin", `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Histogram of P(aftershock)">${s}</svg>`);
@@ -1126,6 +1142,7 @@ function showBackground(on) {
   if (!state.loaded || !R || !R.projection) return;
   if (map.getLayer("bgrate")) map.setLayoutProperty("bgrate", "visibility", on ? "visible" : "none");
   $("bg-legend").hidden = !on || !R.bg;
+  $("bg-opts").hidden = !on || !R.bg;
   if (!on || R.bg || R.bgBusy) return;
   R.bgBusy = true;
   $("bg-status").textContent = "computing…";
@@ -1151,30 +1168,44 @@ function showBackground(on) {
     const hi = inside.at(-1) || 1, lo = Math.max(inside[Math.floor(inside.length * 0.05)] || 0, hi * 1e-4);
     const cv = document.createElement("canvas");
     cv.width = nx; cv.height = ny;
-    const ctx = cv.getContext("2d"), img = ctx.createImageData(nx, ny), L0 = Math.log10(lo), L1 = Math.log10(hi);
-    for (let c = 0; c < out.length; c++) {
-      const v = out[c] * toUnit;
-      if (v < lo) continue;                                   // below the range: transparent
-      const [rr, gg, bb] = bilbao((Math.log10(v) - L0) / (L1 - L0));
-      img.data.set([rr, gg, bb, 220], 4 * c);
-    }
-    ctx.putImageData(img, 0, 0);
-    const coordinates = [[w, n], [e, n], [e, s], [w, s]];
-    if (map.getSource("bgrate")) map.getSource("bgrate").updateImage({ url: cv.toDataURL(), coordinates });
-    else {
-      map.addSource("bgrate", { type: "image", url: cv.toDataURL(), coordinates });
-      map.addLayer({ id: "bgrate", type: "raster", source: "bgrate", paint: { "raster-opacity": 0.85, "raster-resampling": "linear", "raster-fade-duration": 0 } }, "events");
-    }
     R.bg = { lo, hi };
+    R.bgGrid = { out, toUnit, nx, ny, cv, coordinates: [[w, n], [e, n], [e, s], [w, s]] };
     R.bgBusy = false;
-    const sci = v => v >= 0.01 && v < 1000 ? v.toPrecision(2) : v.toExponential(1);
-    $("bg-lo").textContent = sci(lo); $("bg-hi").textContent = sci(hi);
-    $("bg-unit").textContent = `M ≥ ${R.events.mag_cutoff} background events per year per 10,000 km², log scale`;
-    $("bg-status").textContent = `(${nx} × ${ny} grid, ${Math.round(performance.now() - t0)} ms)`;
+    paintBg();
+    $("bg-status").textContent = `${nx} × ${ny} grid, computed in ${Math.round(performance.now() - t0)} ms`;
     showBackground($("bg-toggle").checked);
   };
   bgWorker.postMessage({ lon: ev.lon, lat: ev.lat, phi: ev.p_background, h: ev.bandwidth, kind: R.projection.kind,
     lon0: R.projection.lon0, lat0: R.projection.lat0, w, e, s, n, nx, ny });
+}
+
+// Draw the computed background grid: colour range lo..hi (log or linear), cells below the
+// slider's threshold left transparent. The slider is log-spaced over lo..hi in both scales.
+function paintBg() {
+  const g = R && R.bgGrid;
+  if (!g || !state.loaded) return;
+  const { lo, hi } = R.bg, log = $("bg-log").checked, L0 = Math.log10(lo), L1 = Math.log10(hi);
+  const f = +$("bg-min").value / 1000, thr = lo * Math.pow(hi / lo, f);
+  const ctx = g.cv.getContext("2d"), img = ctx.createImageData(g.nx, g.ny);
+  for (let c = 0; c < g.out.length; c++) {
+    const v = g.out[c] * g.toUnit;
+    if (!(v >= thr)) continue;
+    const [rr, gg, bb] = bilbao(log ? (Math.log10(v) - L0) / (L1 - L0) : v / hi);
+    img.data.set([rr, gg, bb, 220], 4 * c);
+  }
+  ctx.putImageData(img, 0, 0);
+  const url = g.cv.toDataURL();
+  if (map.getSource("bgrate")) map.getSource("bgrate").updateImage({ url, coordinates: g.coordinates });
+  else {
+    map.addSource("bgrate", { type: "image", url, coordinates: g.coordinates });
+    map.addLayer({ id: "bgrate", type: "raster", source: "bgrate", paint: { "raster-opacity": 0.85, "raster-resampling": "linear", "raster-fade-duration": 0 } }, "events");
+  }
+  const sci = v => v === 0 ? "0" : v >= 0.01 && v < 1000 ? v.toPrecision(2) : v.toExponential(1);
+  const ticks = [0, 1, 2, 3].map(k => log ? Math.pow(10, L0 + k * (L1 - L0) / 3) : hi * k / 3);
+  $("bg-ticks").innerHTML = ticks.map(t => `<span>${sci(t)}</span>`).join("");
+  $("bg-min-out").textContent = f ? `${sci(thr)} / yr / 10⁴ km²` : "all";
+  $("bg-unit").textContent = `M ≥ ${R.events.mag_cutoff} background events per year per 10,000 km², ${log ? "log" : "linear"} scale` +
+    (f ? `; only rates above ${sci(thr)} shown` : "");
 }
 
 // Fit the view to all events (their bounding box; centred on its middle).
@@ -1256,6 +1287,11 @@ $("process").onclick = () => API ? startRealJob() : DEMO_HOST ? demoProcess() : 
 $("bg-toggle").addEventListener("change", e => showBackground(e.target.checked));
 $("show-outside").addEventListener("change", paintEvents);
 $("hist-dl").onclick = downloadHist;
+// Redraws are debounced: a new image while MapLibre still loads the last one aborts it (logs an error).
+let bgTimer = null;
+const paintBgSoon = () => { clearTimeout(bgTimer); bgTimer = setTimeout(paintBg, 80); };
+for (const id of ["bg-log", "bg-lin"]) $(id).addEventListener("change", paintBgSoon);
+$("bg-min").addEventListener("input", paintBgSoon);
 $("copy").onclick = async () => { try { await navigator.clipboard.writeText(location.href); $("copy").textContent = "Copied"; } catch { $("copy").textContent = "Select it"; } };
 document.querySelectorAll(".seg button").forEach(b => b.onclick = () => {
   state.show = b.dataset.show;
