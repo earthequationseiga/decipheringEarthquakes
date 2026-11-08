@@ -1,0 +1,12 @@
+[
+ {
+  "file": "indonesia_2010_m52.json",
+  "title": "Indonesia (ISC), 2010\u20132024, Mw \u2265 5.2",
+  "note": "Whole arc: 780 target events; 348 background, 224 uncertain, 208 aftershocks"
+ },
+ {
+  "file": "sumatra_2000_m52.json",
+  "title": "Sumatra (ISC), 2000\u20132024, Mw \u2265 5.2",
+  "note": "Sumatra trench: 598 target events; 65 background, 268 uncertain, 265 aftershocks (dominated by the 2004\u20132007 great earthquakes)"
+ }
+]

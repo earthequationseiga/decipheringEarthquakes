@@ -6,3 +6,4 @@ PROMPTS.md
 
 # Local server job folders (uploaded catalogues, fits)
 jobs/
+__pycache__/

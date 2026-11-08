@@ -58,6 +58,11 @@ def check_request(req):
                             ("t", cols[2], -1e15, 1e15), ("m", cols[3], -5, 12)):
         if not all(isinstance(v, (int, float)) and math.isfinite(v) and lo <= v <= hi for v in c):
             raise ValueError(f"events.{name}: values must be numbers in [{lo}, {hi}]")
+    depth = ev.get("depth") or [None] * n     # optional, shown on the page only (the model ignores it)
+    if (not isinstance(depth, list) or len(depth) != n
+            or not all(v is None or (isinstance(v, (int, float)) and math.isfinite(v) and -20 <= v <= 1000) for v in depth)):
+        raise ValueError("events.depth: values must be null or numbers in [-20, 1000] km")
+    cols.append(depth)
     poly = req.get("polygon")
     if (not isinstance(poly, list) or not 3 <= len(poly) <= 200
             or not all(isinstance(p, list) and len(p) == 2 and all(isinstance(v, (int, float)) and math.isfinite(v) for v in p) for p in poly)):
@@ -95,7 +100,7 @@ def write_job(jid, req):
     """Job folder: catalogue.etas (steqpy's catalogue format: id lon lat mag t-in-days),
     polygon.txt, config.toml, request.json. Events after the window or below mc are left out;
     earlier events and events outside the polygon stay, as possible triggers."""
-    (lon, lat, t, m), poly, t_from, t_to, mc, jit, fit = check_request(req)
+    (lon, lat, t, m, depth), poly, t_from, t_to, mc, jit, fit = check_request(req)
     # steqpy applies the cuts after jittering, so keep events that the jitter could move in
     m_slack = 0.5 if jit["mag"] == "precision" else jit["mag"]
     keep = sorted((ti, i) for i, ti in enumerate(t)
@@ -109,6 +114,9 @@ def write_job(jid, req):
         fh.write("'uploaded catalogue: id lon lat mag t(days since t0)'\n")
         for k, (ti, i) in enumerate(keep):
             fh.write(f"{k + 1} {lon[i]:.6f} {lat[i]:.6f} {m[i]:.3f} {(ti - t0) / DAY_MS:.8f}\n")
+    # uploaded values of each catalogue.etas row, for the page's event panel (see uploaded_values)
+    (d / "uploaded.json").write_text(json.dumps({k: [c[i] for _, i in keep] for k, c in
+                                                 (("t_ms", t), ("lon", lon), ("lat", lat), ("mag", m), ("depth", depth))}))
     (d / "polygon.txt").write_text("".join(f"{x:.6f} {y:.6f}\n" for x, y in poly))
     cfg = ["# Written by the website's local server", "[input]",
            'catalog = "catalogue.etas"', 'polygon = "polygon.txt"', "t_min = 0.0",
@@ -153,6 +161,39 @@ def worker():
             jobs[jid] = {"state": "done" if ok else "failed", "message": msg}
 
 
+def uploaded_values(d, n):
+    """The uploaded values (before jitter, with depth) of each event in result.json, in its order,
+    or None for older jobs. steqpy keeps no row ids, so its reader is rerun on catalogue.etas with
+    lon replaced by the row number and lon jitter off: the other columns get the same noise (all
+    four are drawn whatever the widths), so the same events pass the cuts in the same order."""
+    f, cache = d / "uploaded.json", d / "out" / "uploaded_aligned.json"
+    if cache.exists():
+        return json.loads(cache.read_text())
+    if not f.exists():
+        return None
+    import tomllib
+    import numpy as np
+    if str(STEQPY_SRC) not in sys.path:
+        sys.path.insert(0, str(STEQPY_SRC))
+    from steqpy.readers import read_catalog
+    inp = tomllib.loads((d / "config.toml").read_text())["input"]
+    rows = np.loadtxt(d / "catalogue.etas", skiprows=1, ndmin=2)
+    rows[:, 1] = np.arange(len(rows))
+    tmp = d / "out" / "rows.etas"
+    np.savetxt(tmp, rows, header="row numbers in place of lon", comments="")   # %.18e: exact round trip
+    jitter = {k: inp.get(f"jitter_{k}", 0.0) for k in ("lon", "lat", "mag", "t")}
+    jitter["lon"] = 0.0
+    idx = read_catalog(tmp, inp["mag_min"], inp["t_min"], inp["t_end"] - inp["t_min"], jitter,
+                       int(inp.get("jitter_seed", 0)))[0].astype(int)
+    tmp.unlink()
+    if len(idx) != n:
+        return None
+    up = json.loads(f.read_text())
+    out = {k: [v[i] for i in idx] for k, v in up.items()}
+    cache.write_text(json.dumps(out))
+    return out
+
+
 def status(jid):
     d = JOBS / jid
     with lock:
@@ -188,6 +229,13 @@ class Handler(BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
         if path in ("/", "/index.html"):
             return self.send(200, (HERE / "index.html").read_bytes(), "text/html; charset=utf-8")
+        if path == "/health":                # the page checks this: answered = real fits, else demo mode
+            return self.send(200, {"ok": True})
+        m = re.match(r"^/examples/([A-Za-z0-9_-]+\.(json|csv))$", path)   # saved analyses, sample catalogue
+        if m:
+            f = HERE / "examples" / m.group(1)
+            ctype = "text/csv; charset=utf-8" if m.group(2) == "csv" else "application/json"
+            return self.send(200, f.read_bytes(), ctype) if f.exists() else self.send(404, {"error": "not found"})
         m = re.match(r"^/jobs/([^/]+)(/result)?$", path)
         if not m or not JOB_ID.match(m.group(1)):
             return self.send(404, {"error": "not found"})
@@ -198,6 +246,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(404, {"error": "no result yet"})
             res = json.loads(f.read_text(encoding="utf-8"))
             res["request"] = json.loads((JOBS / jid / "request.json").read_text())   # t0, settings
+            res["events"]["uploaded"] = uploaded_values(JOBS / jid, len(res["events"]["lon"]))
             return self.send(200, res)
         s = status(jid)
         return self.send(200, s) if s else self.send(404, {"error": "unknown job"})

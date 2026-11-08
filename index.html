@@ -40,6 +40,13 @@ body {
 }
 #mock-pill { top: 14px; }
 #hint { top: 54px; background: var(--accent); color: #fff; max-width: calc(100% - 28px); }
+#event-card {
+  position: absolute; left: 248px; bottom: 34px; z-index: 3; background: var(--surface); border-radius: 14px;
+  padding: 10px 14px; box-shadow: 0 2px 10px rgba(38,50,61,.16); font-size: 12px; width: 270px;
+}
+#event-card table { margin-top: 4px; font-size: 12px; }
+#event-card th { color: var(--ink-2); font-weight: 600; width: 72px; }
+#event-card .x { position: absolute; right: 8px; top: 4px; border: 0; background: none; font-size: 18px; cursor: pointer; color: var(--ink-2); }
 #legend, #age-legend {
   position: absolute; left: 14px; bottom: 34px; z-index: 2; background: var(--surface); border-radius: 14px;
   padding: 10px 14px; box-shadow: 0 2px 10px rgba(38,50,61,.16); font-size: 12px; width: 220px;
@@ -114,6 +121,10 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 4px 0; }
 .seg button[aria-pressed=true] { background: var(--accent); color: #fff; }
 #hist { position: relative; }
 #hist svg { display: block; width: 100%; height: auto; }
+#mc-plot { position: relative; }
+.tipbox { position: absolute; pointer-events: none; background: var(--ink); color: #fff; padding: 4px 8px; border-radius: 8px; font-size: 12px; white-space: nowrap; transform: translate(-50%, -100%); }
+ol.steps li.can { cursor: pointer; }
+ol.steps li.can:hover { outline: 1.5px solid var(--accent); }
 #tip { position: absolute; pointer-events: none; background: var(--ink); color: #fff; padding: 4px 8px; border-radius: 8px; font-size: 12px; white-space: nowrap; transform: translate(-50%, -100%); }
 .key { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--ink-2); margin: 4px 0; }
 .key span { display: inline-flex; gap: 5px; align-items: center; }
@@ -165,15 +176,19 @@ td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
     <div class="note">Bigger circle, bigger magnitude (USGS sizes).<span id="age-faded" hidden> Faded: outside your study.</span></div>
   </div>
   <div id="coords" hidden></div>
+  <div id="event-card" hidden></div>
 </div>
 
 <aside>
   <h1>Quake Sorter</h1>
   <p class="sub">Which earthquakes are background, and which were triggered by others?</p>
   <ol class="steps" aria-label="Progress">
-    <li id="s-upload">1 Upload</li><li id="s-area">2 Area</li><li id="s-job">3 Wait</li><li id="s-results">4 Results</li>
+    <li id="s-upload" tabindex="0">1 Upload</li><li id="s-area" tabindex="0">2 Area</li><li id="s-job" tabindex="0">3 Wait</li><li id="s-results" tabindex="0">4 Results</li>
   </ol>
 
+  <div class="notice" id="demo-banner" hidden>Demo: this copy of the site has no server, so it can't fit new
+    catalogues. Everything up to Process works with your own file (it stays in your browser), and stored fits
+    of the sample catalogue open below. To run fits, start <code>server.py</code> on your own computer (see the README).</div>
   <section id="v-upload">
     <h2>Upload your catalogue</h2>
     <div class="drop" id="drop">
@@ -185,6 +200,10 @@ td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
       <label class="filebtn">Choose a CSV file<input type="file" id="file" accept=".csv,.txt,text/csv"></label>
       <p class="small">or drop it here. It stays in your browser until you press Process.</p>
       <button id="sample">Try the sample catalogue</button>
+    </div>
+    <div id="saved" hidden>
+      <h3>Or open a saved analysis</h3>
+      <ul class="report" id="saved-list"></ul>
     </div>
     <div id="report" hidden>
       <h2>File check</h2>
@@ -304,7 +323,13 @@ const C_AFT = "#15395b", C_UNC = "#6388c6", C_BG = "#d8dade";
 // Crameri's Bilbao, 17 stops, light to dark red: background-rate map on a log scale.
 const BILBAO = ["#ffffff", "#eaeaea", "#d7d7d3", "#cac7bc", "#c2bca6", "#bbb291", "#b5a57c", "#ae956d", "#aa8665",
   "#a67960", "#a26b59", "#9d5c52", "#934b47", "#843938", "#732726", "#601516", "#4d0001"];
-const API = location.protocol.startsWith("http");     // served by server.py: real fits on this machine
+// Three modes. API: served by server.py, real fits on this machine (it answers "health").
+// Demo (DEMO_HOST, no server answering, e.g. GitHub Pages): real sample catalogue and stored fits,
+// no new fits. Opened as a file: the old mockup with made-up data, to judge the layout.
+let API = false;
+const DEMO_HOST = location.protocol.startsWith("http");
+const SAMPLE_CSV = "examples/isc_indonesia_mw.csv";
+let usingSample = false;
 const T0 = Date.UTC(1990, 0, 1), DAY = 864e5, SPAN = 13149; // sample catalogue: 36 years in days
 // USGS Latest Earthquakes markers (their app's getMarkerSize / getMarkerColor): circle diameter in
 // px per whole-magnitude class 0..7+, one table per zoom range (< 5, 5-7, >= 8); age colours.
@@ -409,8 +434,9 @@ function readCatalogue(text) {
     else if (ms === "") r.bad.push([line, "Magnitude is empty"]);
     else if (!isFinite(m)) r.bad.push([line, `Magnitude can't be read: <code>${esc(ms)}</code>`]);
     else {
-      if (cols.depth === undefined || v[cols.depth].trim() === "") r.noDepth++;
-      r.events.push({ lon, lat, m, t, p: Math.pow(rnd(), 0.3) });    // p: made up until real fits exist
+      const ds = cols.depth === undefined ? "" : v[cols.depth].trim(), d = ds === "" || !(+ds >= -20 && +ds <= 1000) ? null : +ds;
+      if (d === null) r.noDepth++;
+      r.events.push({ lon, lat, m, t, d, p: Math.pow(rnd(), 0.3) });    // p: made up until real fits exist
     }
   }
   r.events.sort((a, b) => a.m - b.m);
@@ -499,7 +525,7 @@ function completenessSeries(events) {
   const nb = Math.max(1, Math.ceil((t1 - t0) / QUARTER)), counts = new Array(nb).fill(0), bins = Array.from({ length: nb }, () => []);
   for (const e of events) { const b = Math.min(Math.floor((e.t - t0) / QUARTER), nb - 1); counts[b]++; bins[b].push(e.m); }
   const mc = [];
-  for (let b = 1; b < nb; b++) mc.push({ t: t0 + (b + 1) * QUARTER, mc: cvMc([...bins[b - 1], ...bins[b]], dm) });
+  for (let b = 1; b < nb; b++) mc.push({ t: t0 + (b + 1) * QUARTER, mc: cvMc([...bins[b - 1], ...bins[b]], dm), n: bins[b - 1].length + bins[b].length });
   return { t0, QUARTER, counts, mc, dm };
 }
 function drawCompleteness(events) {
@@ -518,8 +544,23 @@ function drawCompleteness(events) {
   for (let y = Math.ceil(y0 / step) * step; y <= y1; y += step) { const xx = x(Date.UTC(y, 0, 1)); if (xx >= L && xx <= W - Rr) g += `<text x="${xx}" y="${H - B + 14}" text-anchor="middle" font-size="10" fill="#55616c">${y}</text>`; }
   g += `<text x="12" y="${(H - B + TOP) / 2}" font-size="10" fill="#55616c" transform="rotate(-90 12 ${(H - B + TOP) / 2})" text-anchor="middle">events / 3 months</text>`;
   g += `<text x="${W - 6}" y="${(H - B + TOP) / 2}" font-size="10" fill="#5a55c8" transform="rotate(90 ${W - 6} ${(H - B + TOP) / 2})" text-anchor="middle">Mc</text>`;
-  $("mc-plot").innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Events per 3 months and completeness magnitude over time">${g}</svg>`;
+  g += `<circle id="mc-hl" r="4" fill="none" stroke="#5a55c8" stroke-width="1.5" visibility="hidden"/>`;
+  $("mc-plot").innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Events per 3 months and completeness magnitude over time">${g}</svg><div class="tipbox" id="mc-tip" hidden></div>`;
   $("mc-fig").hidden = false;
+  // Hover: the nearest Mc point in time gets a box with its window, Mc and event count.
+  const svg = $("mc-plot").querySelector("svg"), tip = $("mc-tip"), hl = $("mc-hl");
+  const pts = s.mc.filter(p => isFinite(p.mc)).map(p => ({ ...p, x: x(p.t), y: ym(p.mc) }));
+  svg.onmousemove = ev => {
+    const r = svg.getBoundingClientRect(), sx = (ev.clientX - r.left) * W / r.width;
+    let best = null;
+    for (const q of pts) if (!best || Math.abs(q.x - sx) < Math.abs(best.x - sx)) best = q;
+    if (!best || Math.abs(best.x - sx) > 15) { tip.hidden = true; hl.setAttribute("visibility", "hidden"); return; }
+    hl.setAttribute("cx", best.x); hl.setAttribute("cy", best.y); hl.setAttribute("visibility", "visible");
+    tip.innerHTML = `<b>Mc ${best.mc.toFixed(1)}</b><br>${dateOf(best.t - 2 * s.QUARTER)} to ${dateOf(best.t)}<br>${fmt(best.n)} events`;
+    tip.style.left = `${best.x * r.width / W}px`; tip.style.top = `${best.y * r.height / H - 8}px`;
+    tip.hidden = false;
+  };
+  svg.onmouseleave = () => { tip.hidden = true; hl.setAttribute("visibility", "hidden"); };
 }
 
 // A new catalogue: keep its events, set the study dates to its time span, show it whole.
@@ -551,7 +592,7 @@ function loadEvents(events) {
   fullView();
 }
 
-let state = { step: "upload", corners: [], drawing: false, closed: false, show: "all", loaded: false };
+let state = { step: "upload", corners: [], drawing: false, closed: false, show: "all", loaded: false, jobSeen: false };
 let targets = [], stars = [], jobTimer = null, cursor = null;
 let map = null;
 
@@ -580,7 +621,7 @@ function refreshTargets() {
     const inT = state.closed && e.m >= mc && e.t >= from && e.t < to && inPoly(e.lon, e.lat, state.corners);
     if (inT) targets.push(e);
     const age = ageEdges.filter(x => e.t > x).length;      // 0 = oldest fifth .. 4 = newest
-    return { type: "Feature", geometry: { type: "Point", coordinates: [e.lon, e.lat] }, properties: { m: e.m, p: e.p, t: e.t, age, inT: inT ? 1 : 0 } };
+    return { type: "Feature", geometry: { type: "Point", coordinates: [e.lon, e.lat] }, properties: { m: e.m, p: e.p, t: e.t, age, inT: inT ? 1 : 0, ...card(e.t, e.lon, e.lat, e.m, e.d) } };
   });
   if (state.loaded && state.step !== "results") map.getSource("events").setData({ type: "FeatureCollection", features });
   $("n-in").textContent = fmt(targets.length);
@@ -633,6 +674,17 @@ function paintArea() {
   map.getSource("area").setData({ type: "FeatureCollection", features });
 }
 
+// Steps you can go back (or forward) to: Upload always, Area once a catalogue is loaded,
+// Wait once a job was started, Results once there are results.
+const STEPS = ["upload", "area", "job", "results"];
+const stepOpen = s => s === "upload" || (s === "area" && EVENTS.length > 0) || (s === "job" && state.jobSeen) || (s === "results" && !!R);
+function goStep(s) {
+  if (s === state.step || !stepOpen(s) || state.drawing) return;
+  if (state.loaded && map.getLayer("bgrate")) map.setLayoutProperty("bgrate", "visibility", "none");
+  setStep(s);
+  if (s === "results") { setResultData(); showBackground($("bg-toggle").checked); }
+  else { refreshTargets(); paintArea(); }
+}
 function setStep(step) {
   state.step = step;
   for (const s of ["upload", "area", "job", "results"]) {
@@ -640,6 +692,7 @@ function setStep(step) {
     $("s-" + s).classList.toggle("on", s === step);
   }
   $("s-" + step).setAttribute("aria-current", "step");
+  for (const s of STEPS) $("s-" + s).classList.toggle("can", s !== step && stepOpen(s));
   $("legend").hidden = step !== "results";
   $("age-legend").hidden = !(EVENTS.length && (step === "upload" || step === "area"));
   paintEvents();
@@ -659,6 +712,25 @@ function placeStars() {
   }
 }
 function dateOf(t) { return new Date(t).toISOString().slice(0, 10); }
+// Values for the event panel, kept as feature properties (depth -1e9 = not given: properties can't be null)
+function card(t, lon, lat, m, d) { return { ct: t, clon: lon, clat: lat, cm: m, cd: d ?? -1e9 }; }
+const hemi = (v, pos, neg) => `${Math.abs(v).toFixed(3)}° ${v >= 0 ? pos : neg}`;
+function showCard(f) {
+  const p = f.properties, d = +p.cd;
+  let html = `<button class="x" aria-label="Close">×</button><b>M ${(+p.cm).toFixed(1)}</b>
+    <table><tr><th>Time</th><td>${new Date(+p.ct).toISOString().slice(0, 19).replace("T", " ")} UTC</td></tr>
+    <tr><th>Location</th><td>${hemi(+p.clat, "N", "S")}, ${hemi(+p.clon, "E", "W")}</td></tr>
+    <tr><th>Depth</th><td>${d > -1e8 ? d.toFixed(1) + " km" : "not given"}</td></tr>`;
+  if (state.step === "results") {
+    const pa = +p.pa;
+    html += p.inT ? `<tr><th>Aftershock</th><td>${pa.toFixed(2)} chance: <b>${pa > 0.9 ? "aftershock" : pa < 0.1 ? "background" : "uncertain"}</b></td></tr>`
+                  : `<tr><th>Study</th><td>Outside it (a possible trigger only)</td></tr>`;
+  }
+  const el = $("event-card");
+  el.innerHTML = html + "</table>";
+  el.hidden = false;
+  el.querySelector(".x").onclick = () => { el.hidden = true; };
+}
 
 // Drawing
 function startDrawing() {
@@ -741,7 +813,7 @@ function drawJobSteps(steps, now) {
 async function startRealJob() {
   $("process").disabled = true;
   const ev = EVENTS;
-  const body = { events: { lon: ev.map(e => e.lon), lat: ev.map(e => e.lat), t: ev.map(e => e.t), m: ev.map(e => e.m) },
+  const body = { events: { lon: ev.map(e => e.lon), lat: ev.map(e => e.lat), t: ev.map(e => e.t), m: ev.map(e => e.m), depth: ev.map(e => e.d ?? null) },
     polygon: state.corners, from_ms: dateMs("from"), to_ms: dateMs("to"), mc: +$("mc").value, jitter: jitterSettings(),
     max_outer: Math.min(Math.max(Math.round(+$("max-outer").value || 11), 1), 100), hessian: $("hessian").checked };
   try {
@@ -757,6 +829,7 @@ async function startRealJob() {
   }
 }
 function pollJob(id) {
+  state.jobSeen = true;
   setStep("job");
   $("link").textContent = location.href;
   $("mock-note").hidden = true;
@@ -797,9 +870,14 @@ const DESCR = { mu: "Background rate scale", A: "Aftershock productivity", c: "T
 const KM_PER_DEG = 111.195;
 
 function resultFeatures(r) {
-  const e = r.events, t0 = r.request ? r.request.t0_ms : 0, mc = e.mag_cutoff || 0;
-  const f = e.lon.map((lon, i) => ({ type: "Feature", geometry: { type: "Point", coordinates: [lon, e.lat[i]] },
-    properties: { m: e.mag_above_cutoff[i] + mc, t: t0 + e.t_days[i] * DAY, pa: 1 - (e.p_background[i] ?? 1), inT: e.target[i] } }));
+  const e = r.events, t0 = r.request ? r.request.t0_ms : 0, mc = e.mag_cutoff || 0, u = e.uploaded;
+  const f = e.lon.map((lon, i) => {
+    const m = e.mag_above_cutoff[i] + mc, t = t0 + e.t_days[i] * DAY;
+    // event panel: the uploaded values (before jitter); older jobs have only the fitted ones
+    const c = u ? card(u.t_ms[i], u.lon[i], u.lat[i], u.mag[i], u.depth[i]) : card(t, lon, e.lat[i], m, null);
+    return { type: "Feature", geometry: { type: "Point", coordinates: [lon, e.lat[i]] },
+      properties: { m, t, pa: 1 - (e.p_background[i] ?? 1), inT: e.target[i], ...c } };
+  });
   return f.sort((a, b) => a.properties.m - b.properties.m);       // largest drawn on top
 }
 function setResultData() {
@@ -824,6 +902,7 @@ function fakeResult() {
 
 function showResults(r) {
   R = r;
+  $("event-card").hidden = true;
   if (API) $("mock-pill").textContent = "Local server: real fit on this machine";
   R.features = resultFeatures(r);
   R.stars = R.features.filter(f => f.properties.inT).slice(-3).map(f => ({ lon: f.geometry.coordinates[0], lat: f.geometry.coordinates[1], m: f.properties.m, t: f.properties.t }));
@@ -1025,29 +1104,67 @@ function useCatalogue(r, source) {
   $("mc-fig").hidden = true;
   if (r.events.length) drawCompleteness(r.events);
   setStep("upload");
-  $("mock-pill").textContent = API ? (source ? "Local server: real fits on this machine" : "Sample catalogue (made up), fitted for real")
-    : source ? "Mockup: your events are real, the results are made up" : "Mockup: all data here is made up";
-  $("example").hidden = !!source;          // the Ridgecrest polygon only fits the sample
+  $("mock-pill").textContent = modePill(source);
+  $("example").hidden = !!source || usingSample;   // the Ridgecrest polygon only fits the made-up sample
 }
 async function readFile(file) {
   if (!file) return;
   useCatalogue(readCatalogue(await file.text()), file.name);
 }
 
+function modePill(source) {
+  if (API) return "Local server: real fits on this machine";
+  if (DEMO_HOST) return usingSample ? "Demo: real sample catalogue, stored fits only"
+    : source ? "Demo: your file stays in your browser, no fits here" : "Demo: no fits on this copy of the site";
+  return source ? "Mockup: your events are real, the results are made up" : "Mockup: all data here is made up";
+}
+// Process without a server: say so, and offer the stored fits instead.
+function demoProcess() {
+  $("area-note").hidden = false;
+  $("area-note").innerHTML = "This demo has no server, so it can't fit your study. Run <code>server.py</code> on your own computer for that (see the README)." +
+    (SAVED.length ? `<br>Stored fits of the sample catalogue:<ul class="report">${savedLinks()}</ul>` : "");
+  wireSaved($("area-note"));
+}
+
 // Controls
-$("sample").onclick = () => useCatalogue({ events: makeEvents(), cols: {}, names: null, ignored: [], noDepth: 0, bad: [], missing: [] }, null);
-$("file").addEventListener("change", e => readFile(e.target.files[0]));
+// Sample: the real ISC Indonesia catalogue when served (demo or server), made-up events as a file.
+$("sample").onclick = async () => {
+  if (DEMO_HOST) {
+    try {
+      const r = await fetch(SAMPLE_CSV);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      usingSample = true;
+      return useCatalogue(readCatalogue(await r.text()), "ISC Indonesia sample (Mw 4+, 1963-2024)");
+    } catch { /* not deployed with the sample: fall back to made-up events */ }
+  }
+  usingSample = false;
+  useCatalogue({ events: makeEvents(), cols: {}, names: null, ignored: [], noDepth: 0, bad: [], missing: [] }, null);
+};
+$("file").addEventListener("change", e => { usingSample = false; readFile(e.target.files[0]); });
 const drop = $("drop");
 drop.addEventListener("dragover", e => { e.preventDefault(); drop.classList.add("over"); });
 drop.addEventListener("dragleave", () => drop.classList.remove("over"));
-drop.addEventListener("drop", e => { e.preventDefault(); drop.classList.remove("over"); readFile(e.dataTransfer.files[0]); });
+drop.addEventListener("drop", e => { e.preventDefault(); drop.classList.remove("over"); usingSample = false; readFile(e.dataTransfer.files[0]); });
 $("to-area").onclick = () => { setStep("area"); refreshTargets(); };
 $("draw").onclick = startDrawing;
 $("example").onclick = useExample;
 $("clear").onclick = clearArea;
+// Dates outside the catalogue (e.g. a typed year 200 for 2000) are pulled back to its span.
+for (const id of ["from", "to"]) $(id).addEventListener("change", () => {
+  const el = $(id), v = el.value;
+  if (!v || (el.min && v < el.min) || (el.max && v > el.max)) {
+    el.value = !v ? (id === "from" ? el.min : el.max) : v < el.min ? el.min : el.max;
+    $("area-note").hidden = false;
+    $("area-note").textContent = `⚠️ ${id === "from" ? "Start" : "End"} date ${v || "(empty)"} is outside the catalogue (${el.min} to ${el.max}), so it was set to ${el.value}.`;
+  }
+});
 for (const id of ["from", "to", "mc"]) $(id).addEventListener("change", () => { refreshTargets(); paintEvents(); });
+for (const s of STEPS) {
+  $("s-" + s).onclick = () => goStep(s);
+  $("s-" + s).onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); goStep(s); } };
+}
 document.querySelectorAll("#jitter-box input, #jitter-box select").forEach(el => el.addEventListener("change", refreshTargets));
-$("process").onclick = () => API ? startRealJob() : startJob();
+$("process").onclick = () => API ? startRealJob() : DEMO_HOST ? demoProcess() : startJob();
 $("bg-toggle").addEventListener("change", e => showBackground(e.target.checked));
 $("show-outside").addEventListener("change", paintEvents);
 $("copy").onclick = async () => { try { await navigator.clipboard.writeText(location.href); $("copy").textContent = "Copied"; } catch { $("copy").textContent = "Select it"; } };
@@ -1072,7 +1189,6 @@ function setupMap() {
   map.addControl(new maplibregl.ScaleControl({ maxWidth: 120, unit: "metric" }), "bottom-right");
   // Cursor position readout (mouse only; touch has no hover)
   const coords = $("coords");
-  const hemi = (v, pos, neg) => `${Math.abs(v).toFixed(3)}° ${v >= 0 ? pos : neg}`;
   map.on("mousemove", e => { const { lng, lat } = e.lngLat.wrap(); coords.hidden = false; coords.textContent = `${hemi(lat, "N", "S")}, ${hemi(lng, "E", "W")}`; });
   map.getCanvas().addEventListener("mouseleave", () => { coords.hidden = true; });
   map.on("load", () => {
@@ -1095,7 +1211,12 @@ function setupMap() {
     placeStars();
   });
   map.on("click", e => {
-    if (!state.drawing) return;
+    if (!state.drawing) {           // like the USGS map: click an event for its details, elsewhere to close
+      const f = map.getLayer("events") && map.queryRenderedFeatures(e.point, { layers: ["events"] });
+      if (f && f.length) showCard(f[0]);                 // topmost drawn (largest) one
+      else $("event-card").hidden = true;
+      return;
+    }
     const c = state.corners;
     if (c.length >= 3) {
       const first = map.project(c[0]);
@@ -1124,9 +1245,47 @@ function setupMap() {
 if (window.maplibregl) setupMap();
 else { $("mock-pill").textContent = "The map library didn't load. Check your connection."; }
 
+// Saved analyses: finished results kept in the repo's examples/ (save_example.py), so they open
+// without a server (GitHub Pages too). Each has its own link, #/examples/<file>.
+async function openExample(file) {
+  try {
+    const r = await fetch("examples/" + file);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const res = await r.json();
+    history.replaceState(null, "", "#/examples/" + file);
+    showResults(res);
+    $("mock-pill").textContent = "Stored fit (run earlier on a local server)";
+  } catch (err) {
+    $("saved").hidden = false;
+    $("saved-list").insertAdjacentHTML("beforeend", `<li>⚠️ Couldn't open ${esc(file)}: ${esc(err.message)}</li>`);
+  }
+}
+let SAVED = [];
+const savedLinks = () => SAVED.map(e => `<li><a href="#/examples/${esc(e.file)}" data-file="${esc(e.file)}">${esc(e.title)}</a>` +
+  (e.note ? `<br><span class="small">${esc(e.note)}</span>` : "") + "</li>").join("");
+const wireSaved = el => el.querySelectorAll("a[data-file]").forEach(a => a.onclick = ev => { ev.preventDefault(); openExample(a.dataset.file); });
+fetch("examples/index.json").then(r => r.ok ? r.json() : []).then(list => {
+  SAVED = list;
+  if (!list.length) return;
+  $("saved-list").innerHTML = savedLinks();
+  wireSaved($("saved-list"));
+  $("saved").hidden = false;
+}).catch(() => {});                 // opened as a file: no list
+
 // Opening a job link goes straight to its state: polled from the server, or (opened as a
 // file) a made-up finished job.
-if (location.hash.startsWith("#/jobs/") && API) pollJob(location.hash.slice(7));
+(async () => {
+if (DEMO_HOST) {
+  try { API = (await fetch("health", { cache: "no-store" })).ok; } catch { API = false; }
+  $("mock-pill").textContent = modePill(null);
+  $("demo-banner").hidden = API;
+}
+if (location.hash.startsWith("#/examples/")) openExample(location.hash.slice(11));
+else if (location.hash.startsWith("#/jobs/") && API) pollJob(location.hash.slice(7));
+else if (location.hash.startsWith("#/jobs/") && DEMO_HOST) {
+  setStep("upload");
+  $("demo-banner").insertAdjacentHTML("beforeend", "<br><b>That job link points to someone's own server, so it can't open here.</b>");
+}
 else if (location.hash.startsWith("#/jobs/")) {
   loadEvents(makeEvents());
   state.corners = RIDGECREST.map(v => [...v]);
@@ -1134,6 +1293,7 @@ else if (location.hash.startsWith("#/jobs/")) {
   refreshTargets();
   showResults(fakeResult());
 } else setStep("upload");
+})();
 </script>
 </body>
 </html>
