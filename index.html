@@ -40,11 +40,12 @@ body {
 }
 #mock-pill { top: 14px; }
 #hint { top: 54px; background: var(--accent); color: #fff; max-width: calc(100% - 28px); }
-#legend {
+#legend, #age-legend {
   position: absolute; left: 14px; bottom: 34px; z-index: 2; background: var(--surface); border-radius: 14px;
   padding: 10px 14px; box-shadow: 0 2px 10px rgba(38,50,61,.16); font-size: 12px; width: 220px;
 }
-#legend strong { display: block; margin-bottom: 5px; font-size: 13px; }
+#legend strong, #age-legend strong { display: block; margin-bottom: 5px; font-size: 13px; }
+#age-legend .note { color: var(--ink-2); margin-top: 6px; }
 #legend .ramp { height: 10px; border-radius: 5px; background: linear-gradient(90deg, var(--triggered), #bdb9ae, var(--background)); }
 #legend .ends { display: flex; justify-content: space-between; color: var(--ink-2); margin-top: 3px; }
 #legend .note { color: var(--ink-2); margin-top: 6px; }
@@ -65,6 +66,13 @@ button:disabled { background: var(--hairline); color: var(--muted); cursor: not-
 .row { display: flex; gap: 8px; flex-wrap: wrap; }
 .drop { border: 2px dashed var(--axis); border-radius: 18px; padding: 20px; text-align: center; background: var(--page); }
 .drop .big { font-size: 34px; line-height: 1.2; }
+.drop.over { border-color: var(--accent); background: var(--accent-soft); }
+.filebtn { display: inline-block; margin: 8px 0 2px; padding: 9px 14px; border-radius: 12px; background: var(--accent); color: #fff; cursor: pointer; font-size: 15px; }
+.filebtn:focus-within { outline: 3px solid var(--accent); outline-offset: 2px; }
+.filebtn input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+#coords { position: absolute; right: 10px; bottom: 58px; z-index: 2; background: rgba(255,253,248,.9); border-radius: 8px; padding: 2px 8px; font-size: 12px; font-variant-numeric: tabular-nums; pointer-events: none; }
+#age-legend .sw { display: flex; gap: 6px; align-items: center; margin-top: 3px; }
+#age-legend .sw i { width: 11px; height: 11px; border-radius: 50%; border: 0.5px solid #26323d; flex: none; }
 code { font: 12px ui-monospace, Consolas, monospace; background: var(--page); padding: 2px 5px; border-radius: 6px; overflow-wrap: anywhere; }
 .report { margin: 12px 0 0; padding: 0; list-style: none; }
 .report li { padding: 8px 10px; border-radius: 10px; margin-top: 6px; background: var(--page); }
@@ -106,16 +114,24 @@ td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
 .star { width: 26px; height: 26px; cursor: default; filter: drop-shadow(0 1px 2px rgba(38,50,61,.45)); }
 .maplibregl-popup-content { border-radius: 12px; font: 13px Montserrat, system-ui, sans-serif; color: var(--ink); padding: 8px 12px; }
 [hidden] { display: none !important; }
+/* Desktop only (user decision): drawing polygons and reading the map need a computer.
+   Small screens get a notice with the page's link instead of the tool. */
+#desktop-only { display: none; padding: 32px 22px; max-width: 520px; margin: 0 auto; }
 @media (max-width: 800px) {
   body { display: block; height: auto; overflow: auto; }
-  #map-wrap { height: 55vh; }
-  aside { box-shadow: none; padding: 18px 16px; }
-  #legend { bottom: 28px; width: 190px; }
-  #legend .note { display: none; }
+  body > :not(#desktop-only) { display: none !important; }
+  #desktop-only { display: block; }
 }
 </style>
 </head>
 <body>
+<div id="desktop-only">
+  <h1>Quake Sorter</h1>
+  <p class="sub">Which earthquakes are background, and which were triggered by others?</p>
+  <p>This tool needs a computer: you upload a catalogue and draw your study area on a map.
+    Please open this link in a browser on your computer, or make this window wider.</p>
+  <div class="link"><code id="desk-link"></code><button id="desk-copy">Copy link</button></div>
+</div>
 <div id="map-wrap">
   <div id="map" role="application" aria-label="Map of earthquakes"></div>
   <div id="mock-pill">Mockup: all data here is made up</div>
@@ -126,6 +142,12 @@ td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
     <div class="ends"><span>0 triggered</span><span>1 background</span></div>
     <div class="note">Bigger dot, bigger magnitude. Grey dots are outside your study. Stars mark the 3 largest inside.</div>
   </div>
+  <div id="age-legend" hidden>
+    <strong>Age</strong>
+    <div id="age-rows"></div>
+    <div class="note">Bigger circle, bigger magnitude (USGS sizes).<span id="age-faded" hidden> Faded: outside your study.</span></div>
+  </div>
+  <div id="coords" hidden></div>
 </div>
 
 <aside>
@@ -137,30 +159,19 @@ td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
 
   <section id="v-upload">
     <h2>Upload your catalogue</h2>
-    <div class="drop">
+    <div class="drop" id="drop">
       <div class="big" aria-hidden="true">📂</div>
-      <p>A CSV file with these columns:</p>
-      <p><code>time, longitude, latitude, depth, magnitude</code></p>
-      <p class="small">Depth may be empty, because the model doesn't use it.</p>
+      <p>A CSV file with a header row naming the <b>time</b>, <b>longitude</b>, <b>latitude</b> and
+        <b>magnitude</b> columns, in any order.</p>
+      <p class="small">Common names work, like <code>origin_time</code>, <code>lat</code>, <code>lon</code>,
+        <code>mag</code>. Depth is optional and other columns are ignored. Times without a time zone are read as UTC.</p>
+      <label class="filebtn">Choose a CSV file<input type="file" id="file" accept=".csv,.txt,text/csv"></label>
+      <p class="small">or drop it here. It stays in your browser until you press Process.</p>
       <button id="sample">Try the sample catalogue</button>
-      <p class="small">Real file upload isn't connected in this mockup.</p>
     </div>
     <div id="report" hidden>
       <h2>File check</h2>
-      <ul class="report">
-        <li>✅ <b id="r-ok"></b> rows ready</li>
-        <li>💡 <b>1,204</b> rows have no depth. That's fine.</li>
-        <li class="warn">⚠️ <b>12</b> rows will be skipped
-          <details><summary>See which ones</summary>
-            <table><thead><tr><th class="n">Line</th><th>Problem</th></tr></thead><tbody>
-              <tr><td class="n">18</td><td>Time can't be read: <code>2003-13-41</code></td></tr>
-              <tr><td class="n">406</td><td>Latitude out of range: <code>135.2</code></td></tr>
-              <tr><td class="n">2,951</td><td>Magnitude is empty</td></tr>
-              <tr><td colspan="2" class="small">and 9 more</td></tr>
-            </tbody></table>
-          </details>
-        </li>
-      </ul>
+      <ul class="report" id="report-list"></ul>
       <button class="primary" id="to-area">Continue</button>
     </div>
   </section>
@@ -176,7 +187,8 @@ td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
       <label>From<input type="date" id="from" value="1990-01-01"></label>
       <label>To<input type="date" id="to" value="2025-12-31"></label>
     </div>
-    <label>Smallest magnitude<input type="number" id="mc" value="3" min="2.5" max="6" step="0.1"></label>
+    <label>Smallest magnitude<input type="number" id="mc" value="3" step="0.1"></label>
+    <p class="small" id="mc-note" hidden></p>
     <div class="count"><b id="n-in">0</b> events in your study
       <div class="small">Events outside it are still used as possible triggers.</div>
     </div>
@@ -223,7 +235,11 @@ td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
 <script>
 "use strict";
 const TEAL = "#009b94", CORAL = "#ee5a45", MID = "#bdb9ae", OUTSIDE = "#c6c8c6";
-const T0 = Date.UTC(1990, 0, 1), DAY = 864e5, SPAN = 13149; // 36 years in days
+const T0 = Date.UTC(1990, 0, 1), DAY = 864e5, SPAN = 13149; // sample catalogue: 36 years in days
+// USGS Latest Earthquakes markers (their app's getMarkerSize / getMarkerColor): circle diameter in
+// px per whole-magnitude class 0..7+, one table per zoom range (< 5, 5-7, >= 8); age colours.
+const USGS_DIAM = [[5, 7, 9, 11, 13, 17, 21, 25], [8, 10, 12, 14, 17, 22, 27, 32], [12, 13, 15, 17, 19, 24, 30, 36]];
+const AGE_COLORS = ["#cccccc", "#ffffff", "#ffff00", "#ff9900", "#ff0000"]; // oldest fifth .. newest fifth
 const JOB_ID = "x7Kp2mQ9vT4n";
 const FEW_EVENTS = 300; // shortcut: placeholder warning level, set it from fits on small polygons
 const RIDGECREST = [[-118.05, 36.2], [-117.1, 36.2], [-117.1, 35.25], [-118.05, 35.25]];
@@ -241,19 +257,153 @@ function makeEvents() {
     const s = rnd() * (fault.length - 1), k = Math.floor(s), f = s - k;
     const spread = rnd() < 0.25 ? 0.9 : 0.22;
     ev.push({ lon: fault[k][0] + (fault[k + 1][0] - fault[k][0]) * f + gauss() * spread, lat: fault[k][1] + (fault[k + 1][1] - fault[k][1]) * f + gauss() * spread,
-      m: mag(), t: rnd() * SPAN, p: Math.pow(rnd(), 0.3) });
+      m: mag(), t: T0 + rnd() * SPAN * DAY, p: Math.pow(rnd(), 0.3) });
   }
   const clusters = [[-117.58, 35.75, 5000, 10780, 7.1], [-116.5, 34.35, 3500, 900, 7.0], [-118.55, 34.25, 1500, 1480, 6.7], [-121.85, 37.05, 1000, 100, 6.8], [-116.27, 34.6, 1000, 3570, 7.0]];
   for (const [lon, lat, n, t0, top] of clusters) {
-    ev.push({ lon, lat, m: top, t: t0, p: 0.93 });
+    ev.push({ lon, lat, m: top, t: T0 + t0 * DAY, p: 0.93 });
     for (let i = 0; i < n; i++) {
       const along = gauss() * 0.14, across = gauss() * 0.035;
-      ev.push({ lon: lon + along * 0.6 + across, lat: lat - along * 0.8 + across, m: mag(), t: Math.min(t0 + -Math.log(1 - rnd()) * 400, SPAN), p: 0.9 * Math.pow(rnd(), 3.5) });
+      ev.push({ lon: lon + along * 0.6 + across, lat: lat - along * 0.8 + across, m: mag(), t: T0 + Math.min(t0 + -Math.log(1 - rnd()) * 400, SPAN) * DAY, p: 0.9 * Math.pow(rnd(), 3.5) });
     }
   }
   return ev.sort((a, b) => a.m - b.m);
 }
-const EVENTS = makeEvents();
+// Events: { lon, lat, m, t (ms since 1970, UTC), p (made-up background probability) },
+// sorted by magnitude so the largest draw on top.
+let EVENTS = [];
+let ageEdges = [];          // 4 times splitting the catalogue's span into 5 equal parts
+
+// -- Reading the user's CSV in the browser -------------------------------------------------
+// Header names we recognise, compared lower-cased with everything but letters and digits removed
+// ("Depth (km)" -> "depthkm"). Within a field, earlier names win.
+// shortcut: separate date and time columns are not joined; such files fail on the time check.
+const ALIASES = {
+  time: ["time", "origintime", "origintimeutc", "timeutc", "datetime", "eventtime", "timestamp", "date"],
+  lon: ["longitude", "lon", "long", "lng"],
+  lat: ["latitude", "lat"],
+  depth: ["depth", "depthkm", "dep"],
+  mag: ["magnitude", "mag", "ml", "mw", "mb", "ms", "m"],
+};
+const FIELD_NAMES = { time: "time", lon: "longitude", lat: "latitude", depth: "depth", mag: "magnitude" };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+function splitRow(line, sep) {
+  if (!line.includes('"')) return line.split(sep);
+  const out = [];
+  let cur = "", quoted = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (quoted) {
+      if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+      else if (ch === '"') quoted = false;
+      else cur += ch;
+    } else if (ch === '"') quoted = true;
+    else if (ch === sep) { out.push(cur); cur = ""; }
+    else cur += ch;
+  }
+  out.push(cur);
+  return out;
+}
+function parseTime(s) {
+  let iso = s.trim().replace(" ", "T");
+  if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) iso += "T00:00:00";
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(iso)) return NaN;
+  if (!/(Z|[+-]\d{2}:?\d{2})$/i.test(iso)) iso += "Z";      // no time zone given: UTC
+  return Date.parse(iso);
+}
+
+// Returns { events, cols, ignored, noDepth, bad: [[line, reason]], missing: [field names] }.
+function readCatalogue(text) {
+  const lines = text.replace(/^﻿/, "").split(/\r?\n/);
+  const head = lines[0] || "";
+  const sep = [",", "\t", ";"].reduce((a, s) => head.split(s).length > head.split(a).length ? s : a, ",");
+  const names = splitRow(head, sep).map(h => h.trim());
+  const keys = names.map(h => h.toLowerCase().replace(/[^a-z0-9]/g, ""));
+  const cols = {};
+  for (const [field, aliases] of Object.entries(ALIASES))
+    for (const a of aliases) { const i = keys.indexOf(a); if (i >= 0 && !Object.values(cols).includes(i)) { cols[field] = i; break; } }
+  const missing = ["time", "lon", "lat", "mag"].filter(f => cols[f] === undefined).map(f => FIELD_NAMES[f]);
+  const ignored = names.filter((_, i) => !Object.values(cols).includes(i));
+  const r = { events: [], cols, names, ignored, noDepth: 0, bad: [], missing };
+  if (missing.length) return r;
+  const need = Math.max(...Object.values(cols)) + 1;
+  for (let k = 1; k < lines.length; k++) {
+    if (!lines[k].trim()) continue;
+    const v = splitRow(lines[k], sep), line = k + 1;
+    if (v.length < need) { r.bad.push([line, `Has ${v.length} values, the header has ${names.length}`]); continue; }
+    const t = parseTime(v[cols.time]), lon = +v[cols.lon], lat = +v[cols.lat], ms = v[cols.mag].trim(), m = +ms;
+    if (!isFinite(t)) r.bad.push([line, `Time can't be read: <code>${esc(v[cols.time])}</code>`]);
+    else if (v[cols.lon].trim() === "" || !(lon >= -180 && lon <= 180)) r.bad.push([line, `Longitude out of range: <code>${esc(v[cols.lon])}</code>`]);
+    else if (v[cols.lat].trim() === "" || !(lat >= -90 && lat <= 90)) r.bad.push([line, `Latitude out of range: <code>${esc(v[cols.lat])}</code>`]);
+    else if (ms === "") r.bad.push([line, "Magnitude is empty"]);
+    else if (!isFinite(m)) r.bad.push([line, `Magnitude can't be read: <code>${esc(ms)}</code>`]);
+    else {
+      if (cols.depth === undefined || v[cols.depth].trim() === "") r.noDepth++;
+      r.events.push({ lon, lat, m, t, p: Math.pow(rnd(), 0.3) });    // p: made up until real fits exist
+    }
+  }
+  r.events.sort((a, b) => a.m - b.m);
+  return r;
+}
+
+function showReport(r, source) {
+  const list = [];
+  if (r.missing.length) {
+    list.push(`<li class="warn">⚠️ Couldn't find a column for <b>${r.missing.join(", ")}</b>. The header has:
+      ${r.names.map(n => `<code>${esc(n)}</code>`).join(" ")}. Rename those columns and try again.</li>`);
+  } else {
+    list.push(`<li>✅ <b>${fmt(r.events.length)}</b> rows ready${source ? ` from <code>${esc(source)}</code>` : ""}</li>`);
+    if (r.names) {
+      const used = Object.entries(r.cols).map(([f, i]) => `${FIELD_NAMES[f]} ← <code>${esc(r.names[i])}</code>`).join(", ");
+      list.push(`<li>🔎 Columns used: ${used}${r.ignored.length ? `. Ignored: ${r.ignored.map(n => `<code>${esc(n)}</code>`).join(" ")}` : ""}</li>`);
+    }
+    if (r.noDepth) list.push(`<li>💡 <b>${fmt(r.noDepth)}</b> rows have no depth. That's fine, the model doesn't use it.</li>`);
+    if (r.bad.length) {
+      const rows = r.bad.slice(0, 20).map(([l, why]) => `<tr><td class="n">${fmt(l)}</td><td>${why}</td></tr>`).join("");
+      const more = r.bad.length > 20 ? `<tr><td colspan="2" class="small">and ${fmt(r.bad.length - 20)} more</td></tr>` : "";
+      list.push(`<li class="warn">⚠️ <b>${fmt(r.bad.length)}</b> rows will be skipped
+        <details><summary>See which ones</summary><table><thead><tr><th class="n">Line</th><th>Problem</th></tr></thead><tbody>${rows}${more}</tbody></table></details></li>`);
+    }
+  }
+  $("report-list").innerHTML = list.join("");
+  $("report").hidden = false;
+  $("to-area").hidden = !r.events.length;
+}
+
+// Magnitude of completeness by maximum curvature + 0.2 (Woessner & Wiemer 2005, BSSA 95,
+// 684-698): the most populated 0.1 bin, plus 0.2. Same as steqpy's scripts/completeness.py MAXC.
+function suggestMc(events) {
+  const counts = new Map();
+  for (const e of events) { const b = Math.round(e.m * 10); counts.set(b, (counts.get(b) || 0) + 1); }
+  let best = 0, top = -1;
+  for (const [b, n] of counts) if (n > top || (n === top && b < best)) { best = b; top = n; }
+  return best / 10 + 0.2;
+}
+
+// A new catalogue: keep its events, set the study dates to its time span, show it whole.
+function loadEvents(events) {
+  EVENTS = events;
+  if (!events.length) return;
+  let t0 = Infinity, t1 = -Infinity;
+  for (const e of events) { t0 = Math.min(t0, e.t); t1 = Math.max(t1, e.t); }
+  ageEdges = [1, 2, 3, 4].map(k => t0 + (t1 - t0) * k / 5);
+  for (const [id, t] of [["from", t0], ["to", t1]]) { $(id).value = dateOf(t); $(id).min = dateOf(t0); $(id).max = dateOf(t1); }
+  // Magnitude cutoff: allowed range = the catalogue's; default = suggested completeness Mc.
+  const mc = suggestMc(events);
+  $("mc").min = events[0].m;                       // events are sorted by magnitude
+  $("mc").max = events[events.length - 1].m;
+  $("mc").value = mc.toFixed(1);
+  $("mc-note").hidden = false;
+  $("mc-note").textContent = `Suggested ${mc.toFixed(1)}: below this the catalogue is likely incomplete ` +
+    `(most common magnitude + 0.2, over the whole file). Change it if you know better.`;
+  $("age-rows").innerHTML = [...AGE_COLORS].reverse().map((c, i) => {
+    const k = 4 - i, lo = k ? ageEdges[k - 1] : t0, hi = k < 4 ? ageEdges[k] : t1;
+    return `<div class="sw"><i style="background:${c}"></i>${dateOf(lo)} to ${dateOf(hi)}</div>`;
+  }).join("");
+  clearArea();
+  fullView();
+}
 
 let state = { step: "upload", corners: [], drawing: false, closed: false, cutoff: 0.5, show: "all", loaded: false };
 let targets = [], stars = [], jobTimer = null, cursor = null;
@@ -274,16 +424,17 @@ function selfCrossing(c) {
   }
   return false;
 }
-function dayOf(id) { return (Date.parse($(id).value) - T0) / DAY; }
+const dateMs = id => Date.parse($(id).value + "T00:00:00Z");
 
 // Work out which events are in the study, then repaint the map to match.
 function refreshTargets() {
-  const from = dayOf("from"), to = dayOf("to"), mc = +$("mc").value;
+  const from = dateMs("from"), to = dateMs("to") + DAY, mc = +$("mc").value;   // "to" day included
   targets = [];
   const features = EVENTS.map(e => {
-    const inT = state.closed && e.m >= mc && e.t >= from && e.t <= to && inPoly(e.lon, e.lat, state.corners);
+    const inT = state.closed && e.m >= mc && e.t >= from && e.t < to && inPoly(e.lon, e.lat, state.corners);
     if (inT) targets.push(e);
-    return { type: "Feature", geometry: { type: "Point", coordinates: [e.lon, e.lat] }, properties: { m: e.m, p: e.p, t: e.t, inT: inT ? 1 : 0 } };
+    const age = ageEdges.filter(x => e.t > x).length;      // 0 = oldest fifth .. 4 = newest
+    return { type: "Feature", geometry: { type: "Point", coordinates: [e.lon, e.lat] }, properties: { m: e.m, p: e.p, t: e.t, age, inT: inT ? 1 : 0 } };
   });
   if (state.loaded) map.getSource("events").setData({ type: "FeatureCollection", features });
   $("n-in").textContent = fmt(targets.length);
@@ -297,14 +448,18 @@ function refreshTargets() {
 }
 
 function paintEvents() {
+  $("age-faded").hidden = !state.closed;
   if (!state.loaded) return;
-  const visible = state.step === "area" || state.step === "results";
+  const visible = state.step !== "job" && EVENTS.length > 0;
   map.setLayoutProperty("events", "visibility", visible ? "visible" : "none");
   const results = state.step === "results";
+  // Before results: USGS age colours; once a study is drawn, events outside it are faded.
   map.setPaintProperty("events", "circle-color", results
     ? ["case", ["==", ["get", "inT"], 1], ["interpolate", ["linear"], ["get", "p"], 0, CORAL, 0.5, MID, 1, TEAL], OUTSIDE]
-    : ["case", ["==", ["get", "inT"], 1], "#4f5d9e", OUTSIDE]);
-  map.setPaintProperty("events", "circle-opacity", ["case", ["==", ["get", "inT"], 1], 0.85, state.closed ? 0.45 : 0.7]);
+    : ["match", ["get", "age"], 0, AGE_COLORS[0], 1, AGE_COLORS[1], 2, AGE_COLORS[2], 3, AGE_COLORS[3], AGE_COLORS[4]]);
+  const faded = state.closed ? (results ? 0.45 : 0.2) : 1;
+  map.setPaintProperty("events", "circle-opacity", ["case", ["==", ["get", "inT"], 1], results ? 0.85 : 1, faded]);
+  map.setPaintProperty("events", "circle-stroke-opacity", ["case", ["==", ["get", "inT"], 1], 1, faded]);
   let filter = null;
   if (results && state.show === "background") filter = ["any", ["==", ["get", "inT"], 0], [">=", ["get", "p"], state.cutoff]];
   if (results && state.show === "triggered") filter = ["any", ["==", ["get", "inT"], 0], ["<", ["get", "p"], state.cutoff]];
@@ -327,6 +482,7 @@ function setStep(step) {
   }
   $("s-" + step).setAttribute("aria-current", "step");
   $("legend").hidden = step !== "results";
+  $("age-legend").hidden = !(EVENTS.length && (step === "upload" || step === "area"));
   paintEvents();
   placeStars();
 }
@@ -344,7 +500,7 @@ function placeStars() {
     stars.push(new maplibregl.Marker({ element: el }).setLngLat([e.lon, e.lat]).addTo(map));
   }
 }
-function dateOf(t) { return new Date(T0 + t * DAY).toISOString().slice(0, 10); }
+function dateOf(t) { return new Date(t).toISOString().slice(0, 10); }
 
 // Drawing
 function startDrawing() {
@@ -481,11 +637,35 @@ function drawHist() {
     bins.map((c, i) => `<tr><td>${(i / BINS).toFixed(2)} to ${((i + 1) / BINS).toFixed(2)}</td><td class="n">${fmt(c)}</td></tr>`).join("") + "</tbody>";
 }
 
-function fullView() { if (map) map.fitBounds([[-125.5, 32], [-113.5, 41]], { padding: 30, duration: 800 }); }
+// Fit the view to all events (their bounding box; centred on its middle).
+// shortcut: a catalogue crossing the antimeridian gets a world-wide box.
+function fullView() {
+  if (!map || !EVENTS.length) return;
+  let w = 180, s = 90, e = -180, n = -90;
+  for (const ev of EVENTS) { w = Math.min(w, ev.lon); e = Math.max(e, ev.lon); s = Math.min(s, ev.lat); n = Math.max(n, ev.lat); }
+  map.fitBounds([[w, s], [e, n]], { padding: 40, duration: 800, maxZoom: 9 });
+}
+
+function useCatalogue(r, source) {
+  showReport(r, source);
+  loadEvents(r.events);
+  setStep("upload");
+  $("mock-pill").textContent = source ? "Mockup: your events are real, the results are made up" : "Mockup: all data here is made up";
+  $("example").hidden = !!source;          // the Ridgecrest polygon only fits the sample
+}
+async function readFile(file) {
+  if (!file) return;
+  useCatalogue(readCatalogue(await file.text()), file.name);
+}
 
 // Controls
-$("sample").onclick = () => { $("r-ok").textContent = fmt(EVENTS.length); $("report").hidden = false; };
-$("to-area").onclick = () => { setStep("area"); refreshTargets(); fullView(); };
+$("sample").onclick = () => useCatalogue({ events: makeEvents(), cols: {}, names: null, ignored: [], noDepth: 0, bad: [], missing: [] }, null);
+$("file").addEventListener("change", e => readFile(e.target.files[0]));
+const drop = $("drop");
+drop.addEventListener("dragover", e => { e.preventDefault(); drop.classList.add("over"); });
+drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+drop.addEventListener("drop", e => { e.preventDefault(); drop.classList.remove("over"); readFile(e.dataTransfer.files[0]); });
+$("to-area").onclick = () => { setStep("area"); refreshTargets(); };
 $("draw").onclick = startDrawing;
 $("example").onclick = useExample;
 $("clear").onclick = clearArea;
@@ -498,7 +678,9 @@ document.querySelectorAll(".seg button").forEach(b => b.onclick = () => {
   document.querySelectorAll(".seg button").forEach(o => o.setAttribute("aria-pressed", o === b));
   paintEvents();
 });
-$("restart").onclick = () => { history.replaceState(null, "", location.pathname); location.reload(); };
+$("desk-link").textContent = location.href.split("#")[0];
+$("desk-copy").onclick = async () => { try { await navigator.clipboard.writeText($("desk-link").textContent); $("desk-copy").textContent = "Copied"; } catch { $("desk-copy").textContent = "Select it"; } };
+$("restart").onclick =() => { history.replaceState(null, "", location.pathname); location.reload(); };
 document.addEventListener("keydown", e => {
   if (!state.drawing) return;
   if (e.key === "Enter") finishDrawing();
@@ -509,14 +691,20 @@ document.addEventListener("keydown", e => {
 function setupMap() {
   map = new maplibregl.Map({ container: "map", style: "https://tiles.openfreemap.org/styles/positron", center: [-119, 37], zoom: 4.6, attributionControl: { compact: false } });
   map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");
+  map.addControl(new maplibregl.ScaleControl({ maxWidth: 120, unit: "metric" }), "bottom-right");
+  // Cursor position readout (mouse only; touch has no hover)
+  const coords = $("coords");
+  const hemi = (v, pos, neg) => `${Math.abs(v).toFixed(3)}° ${v >= 0 ? pos : neg}`;
+  map.on("mousemove", e => { const { lng, lat } = e.lngLat.wrap(); coords.hidden = false; coords.textContent = `${hemi(lat, "N", "S")}, ${hemi(lng, "E", "W")}`; });
+  map.getCanvas().addEventListener("mouseleave", () => { coords.hidden = true; });
   map.on("load", () => {
     const tint = { background: ["background-color", "#fbf4e4"], water: ["fill-color", "#bce6ee"], park: ["fill-color", "#d6efcb"], landcover_wood: ["fill-color", "#dcf0d0"], landuse_residential: ["fill-color", "#f8edd8"] };
     for (const [id, [prop, value]] of Object.entries(tint)) if (map.getLayer(id)) map.setPaintProperty(id, prop, value);
-    const size = ["-", ["get", "m"], 2.5];
+    const byMag = d => ["step", ["get", "m"], d[0] / 2, 1, d[1] / 2, 2, d[2] / 2, 3, d[3] / 2, 4, d[4] / 2, 5, d[5] / 2, 6, d[6] / 2, 7, d[7] / 2];
     map.addSource("events", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
     map.addLayer({ id: "events", type: "circle", source: "events", paint: {
-      "circle-radius": ["interpolate", ["linear"], ["zoom"], 5, ["+", 1, ["*", 0.9, size]], 10, ["+", 2.5, ["*", 2.4, size]]],
-      "circle-stroke-color": "#fffdf8", "circle-stroke-width": 0.5 } });
+      "circle-radius": ["step", ["zoom"], byMag(USGS_DIAM[0]), 5, byMag(USGS_DIAM[1]), 8, byMag(USGS_DIAM[2])],
+      "circle-stroke-color": "#26323d", "circle-stroke-width": 0.5 } });
     map.addSource("area", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
     map.addLayer({ id: "area-fill", type: "fill", source: "area", filter: ["==", ["geometry-type"], "Polygon"], paint: { "fill-color": "#5a55c8", "fill-opacity": 0.05 } });
     map.addLayer({ id: "area-line", type: "line", source: "area", filter: ["!=", ["geometry-type"], "Point"], paint: { "line-color": "#5a55c8", "line-width": 2.5 } });
@@ -556,6 +744,7 @@ else { $("mock-pill").textContent = "The map library didn't load. Check your con
 
 // Opening a job link goes straight to its state, here always a finished job.
 if (location.hash.startsWith("#/jobs/")) {
+  loadEvents(makeEvents());
   state.corners = RIDGECREST.map(v => [...v]);
   state.closed = true;
   refreshTargets();
