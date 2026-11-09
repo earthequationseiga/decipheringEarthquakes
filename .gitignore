@@ -7,3 +7,6 @@ PROMPTS.md
 # Local server job folders (uploaded catalogues, fits)
 jobs/
 __pycache__/
+
+# Saved result files to share privately (may hold non-public catalogues)
+results/

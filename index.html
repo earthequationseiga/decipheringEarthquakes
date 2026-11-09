@@ -1063,11 +1063,7 @@ function downloadHist() {
     cv.width = W * S; cv.height = H * S;
     const g = cv.getContext("2d");
     g.scale(S, S); g.drawImage(img, 0, 0);
-    cv.toBlob(b => {
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(b); a.download = "histogram_p_aftershock.png"; a.click();
-      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-    });
+    cv.toBlob(b => saveBlob(b, "histogram_p_aftershock.png", "PNG image", { "image/png": [".png"] }));
   };
   img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(new XMLSerializer().serializeToString(c));
 }
@@ -1078,7 +1074,23 @@ function saveResult() {
   if (!R) return;
   let name = $("save-name").value.trim().replace(/[\\/:*?"<>|]+/g, "_") || "result.json";
   if (!/\.json$/i.test(name)) name += ".json";
-  const blob = new Blob([JSON.stringify(R, (k, v) => PAGE_ONLY.has(k) ? undefined : v)], { type: "application/json" });
+  saveBlob(new Blob([JSON.stringify(R, (k, v) => PAGE_ONLY.has(k) ? undefined : v)], { type: "application/json" }),
+    name, "Result file", { "application/json": [".json"] });
+}
+// Save with a "Save as" dialog where the browser has one (Chrome, Edge: showSaveFilePicker);
+// elsewhere (Firefox, Safari) a normal download, which asks only if the browser is set to ask.
+async function saveBlob(blob, name, description, accept) {
+  if (window.showSaveFilePicker) {
+    try {
+      const h = await showSaveFilePicker({ suggestedName: name, types: [{ description, accept }] });
+      const w = await h.createWritable();
+      await w.write(blob);
+      await w.close();
+    } catch (e) {
+      if (e.name !== "AbortError") alert(`Couldn't save: ${e.message}`);     // AbortError: cancelled
+    }
+    return;
+  }
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob); a.download = name; a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
