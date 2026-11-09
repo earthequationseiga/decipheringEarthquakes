@@ -1,4 +1,4 @@
-# Quake Sorter
+# deciphering earthquakes
 
 A website where people upload an earthquake catalogue, draw a study area on a map, and get stochastic declustering results: fitted parameters, how many events are certain background, uncertain or certain aftershocks, a histogram of each event's chance of being an aftershock, and maps of the events and of the background rate.
 
