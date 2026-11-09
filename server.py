@@ -236,6 +236,10 @@ class Handler(BaseHTTPRequestHandler):
             f = HERE / "examples" / m.group(1)
             ctype = "text/csv; charset=utf-8" if m.group(2) == "csv" else "application/json"
             return self.send(200, f.read_bytes(), ctype) if f.exists() else self.send(404, {"error": "not found"})
+        m = re.match(r"^/fonts/([A-Za-z0-9_-]+\.woff)$", path)             # the page's font
+        if m:
+            f = HERE / "fonts" / m.group(1)
+            return self.send(200, f.read_bytes(), "font/woff") if f.exists() else self.send(404, {"error": "not found"})
         m = re.match(r"^/jobs/([^/]+)(/result)?$", path)
         if not m or not JOB_ID.match(m.group(1)):
             return self.send(404, {"error": "not found"})

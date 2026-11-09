@@ -10,3 +10,6 @@ __pycache__/
 
 # Saved result files to share privately (may hold non-public catalogues)
 results/
+
+# Personal: site text drafts
+copy.md

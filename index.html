@@ -9,6 +9,8 @@
 <link href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <style>
+/* New Standard (SIL Open Font License, fonts/OFL.txt), converted to TrueType WOFF because Chrome rejects the original CFF: normal text. Bold text stays Montserrat. */
+@font-face { font-family: "New Standard"; src: url("fonts/NewStandard-Regular.woff") format("woff"); font-weight: 400; font-display: swap; size-adjust: 107%; }
 :root {
   color-scheme: light;
   --surface: #fffdf8;
@@ -24,12 +26,19 @@
   --accent-soft: #eeedfb;
   --warn-bg: #fff3d6;
   --good-text: #006300;
+  --text: #000;          /* normal (serif) text */
 }
 * { box-sizing: border-box; }
+/* Dropdown sections: closed, only the title shows; click it for the rest */
+details.sec { margin-top: 10px; padding: 10px 12px; border-radius: 14px; background: var(--page); }
+details.sec > summary { font-size: 15px; font-weight: 800; color: var(--ink); }
+details.sec[open] > summary { margin-bottom: 6px; }
+details.sec.notice { background: var(--warn-bg); }
+details.sec > p.small:first-of-type { margin-top: 0; }
 html, body { height: 100%; margin: 0; }
 body {
-  background: var(--page); color: var(--ink);
-  font: 15px/1.45 Montserrat, system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: var(--page); color: var(--text);
+  font: 15px/1.45 "New Standard", Georgia, serif;
   display: grid; grid-template-columns: minmax(0, 1fr) 390px; height: 100vh; overflow: hidden;
 }
 #map-wrap { position: relative; min-width: 0; }
@@ -52,10 +61,10 @@ body {
   padding: 10px 14px; box-shadow: 0 2px 10px rgba(38,50,61,.16); font-size: 12px; width: 220px;
 }
 #legend strong, #age-legend strong { display: block; margin-bottom: 5px; font-size: 13px; }
-#age-legend .note { color: var(--ink-2); margin-top: 6px; }
+#age-legend .note { color: var(--text); margin-top: 6px; }
 #legend .ramp { height: 10px; border-radius: 5px; background: linear-gradient(90deg, var(--triggered), #bdb9ae, var(--background)); }
-#legend .ends { display: flex; justify-content: space-between; color: var(--ink-2); margin-top: 3px; }
-#legend .note { color: var(--ink-2); margin-top: 6px; }
+#legend .ends { display: flex; justify-content: space-between; color: var(--text); margin-top: 3px; }
+#legend .note { color: var(--text); margin-top: 6px; }
 #legend .sym, #age-legend .sym { display: flex; gap: 6px; align-items: center; margin-top: 3px; }
 .sym i { width: 11px; height: 11px; border-radius: 50%; border: 0.5px solid #26323d; flex: none; }
 .sym svg { flex: none; margin: 0 -2px; }
@@ -67,7 +76,7 @@ h1 { font-size: 23px; font-weight: 800; margin: 0 0 2px; }
 h2 { font-size: 17px; font-weight: 800; margin: 20px 0 8px; }
 h3 { font-size: 14px; font-weight: 800; margin: 18px 0 6px; }
 p { margin: 6px 0; }
-.sub { color: var(--ink-2); margin: 0 0 12px; }
+.sub { color: var(--text); margin: 0 0 12px; }
 ol.steps { list-style: none; padding: 0; margin: 12px 0 0; display: flex; gap: 6px; font-size: 12px; font-weight: 700; color: var(--muted); }
 ol.steps li { flex: 1; text-align: center; padding: 5px 2px; border-radius: 10px; background: var(--page); }
 ol.steps li.on { background: var(--accent-soft); color: var(--accent); }
@@ -102,12 +111,12 @@ code { font: 12px ui-monospace, Consolas, monospace; background: var(--page); pa
 .report li.warn { background: var(--warn-bg); }
 summary { cursor: pointer; font-weight: 700; }
 label { display: block; font-weight: 700; font-size: 13px; margin-top: 10px; }
-input[type=number], input[type=date] { width: 100%; font: inherit; padding: 7px 9px; border: 1px solid var(--axis); border-radius: 10px; background: #fff; color: var(--ink); margin-top: 3px; }
+input[type=number], input[type=date] { width: 100%; font: inherit; padding: 7px 9px; border: 1px solid var(--axis); border-radius: 10px; background: #fff; color: var(--text); margin-top: 3px; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; }
 .count { margin-top: 12px; padding: 12px; border-radius: 14px; background: var(--accent-soft); }
 .count b { font-size: 22px; font-weight: 800; }
 .notice { margin-top: 8px; padding: 9px 11px; border-radius: 10px; background: var(--warn-bg); font-size: 14px; }
-.small { font-size: 13px; color: var(--ink-2); }
+.small { font-size: 13px; color: var(--text); }
 ul.job { list-style: none; padding: 0; margin: 10px 0; }
 ul.job li { display: flex; gap: 10px; padding: 9px 0; color: var(--muted); border-bottom: 1px solid var(--hairline); }
 ul.job li.now { color: var(--ink); font-weight: 800; }
@@ -126,7 +135,7 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 4px 0; }
 .seg { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; margin-top: 4px; }
 .seg button { padding: 7px 2px; font-size: 12px; background: var(--page); color: var(--ink-2); }
 .seg button[data-show=none] { grid-column: 1 / -1; }
-.checks { margin-top: 10px; padding: 10px 12px; border-radius: 14px; background: var(--page); color: var(--ink); }
+.checks { margin-top: 10px; padding: 10px 12px; border-radius: 14px; background: var(--page); color: var(--text); }
 .checks strong { display: block; font-size: 14px; margin-bottom: 2px; }
 .checks table { margin: 0; }
 .checks td { padding: 4px; }
@@ -135,9 +144,9 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 4px 0; }
 .ck.yes { color: var(--good-text); } .ck.no { color: #b3261e; } .ck.off { color: var(--muted); }
 .blob { margin-top: 10px; padding: 8px; border-radius: 14px; background: var(--accent-soft); }
 .blob-h { font-size: 13px; font-weight: 700; padding: 0 4px; }
-.blob .tiles3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.blob .tiles { margin-top: 6px; }
-.blob .tile { background: var(--surface); }
+details.sec .tiles3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+details.sec .tiles { margin-top: 6px; }
+details.sec .tile { background: var(--surface); }
 .expected div { display: flex; gap: 18px; margin-top: 2px; }
 .expected b { font-size: 20px; font-weight: 800; }
 td.sym-p { font-family: "Cambria Math", "STIX Two Math", "Latin Modern Math", "Times New Roman", serif; font-style: italic; font-size: 19px; width: 24px; }
@@ -145,7 +154,7 @@ td.sym-p { font-family: "Cambria Math", "STIX Two Math", "Latin Modern Math", "T
 #bg-status:empty { display: none; }
 /* colour bar under the threshold slider; inset by about half the thumb so it lines up with the track */
 #bg-min-ramp { height: 10px; margin: 0 8px; border-radius: 5px; border: 0.5px solid var(--axis); }
-#bg-min-ticks { display: flex; justify-content: space-between; margin: 2px 2px 0; font-size: 11px; color: var(--ink-2); }
+#bg-min-ticks { display: flex; justify-content: space-between; margin: 2px 2px 0; font-size: 11px; color: var(--text); }
 label.check.radio { font-weight: 600; font-size: 13px; margin-top: 6px; }
 #save-row input { flex: 1; min-width: 0; font: inherit; padding: 7px 9px; border: 1px solid var(--axis); border-radius: 10px; background: #fff; color: var(--ink); }
 .dl { margin-top: 6px; padding: 6px 12px; font-size: 13px; }
@@ -157,14 +166,14 @@ label.check.radio { font-weight: 600; font-size: 13px; margin-top: 6px; }
 ol.steps li.can { cursor: pointer; }
 ol.steps li.can:hover { outline: 1.5px solid var(--accent); }
 #tip { position: absolute; pointer-events: none; background: var(--ink); color: #fff; padding: 4px 8px; border-radius: 8px; font-size: 12px; white-space: nowrap; transform: translate(-50%, -100%); }
-.key { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--ink-2); margin: 4px 0; }
+.key { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--text); margin: 4px 0; }
 .key span { display: inline-flex; gap: 5px; align-items: center; }
 table { border-collapse: collapse; width: 100%; font-size: 13px; margin-top: 6px; }
 th, td { text-align: left; padding: 5px 4px; border-bottom: 1px solid var(--hairline); }
 td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
 .good { color: var(--good-text); font-weight: 800; }
 .star { width: 26px; height: 26px; cursor: default; filter: drop-shadow(0 1px 2px rgba(38,50,61,.45)); }
-.maplibregl-popup-content { border-radius: 12px; font: 13px Montserrat, system-ui, sans-serif; color: var(--ink); padding: 8px 12px; }
+.maplibregl-popup-content { border-radius: 12px; font: 13px "New Standard", Georgia, serif; color: var(--text); padding: 8px 12px; }
 [hidden] { display: none !important; }
 /* Desktop only (user decision): drawing polygons and reading the map need a computer.
    Small screens get a notice with the page's link instead of the tool. */
@@ -174,6 +183,9 @@ td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
   body > :not(#desktop-only) { display: none !important; }
   #desktop-only { display: block; }
 }
+/* bold text: Montserrat (kept last so it wins over font: inherit rules) */
+h1, h2, h3, b, strong, button, label, summary, th, ol.steps, #mock-pill, #hint, .lab, .num, .fieldlab, .blob-h, .cut, .good,
+.checks td.ck, ul.job li.now, .count b, .expected b { font-family: Montserrat, system-ui, -apple-system, "Segoe UI", sans-serif; }
 </style>
 </head>
 <body>
@@ -220,30 +232,32 @@ td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
     <li id="s-upload" tabindex="0">1 Upload</li><li id="s-area" tabindex="0">2 Area</li><li id="s-job" tabindex="0">3 Wait</li><li id="s-results" tabindex="0">4 Results</li>
   </ol>
 
-  <div class="notice" id="demo-banner" hidden>Site demo warning: this GitHub Pages site is just 
-    a mockup to test UI as a personal project, with two example fits of Indonesian data below.
-     To run your own fits, start <code>server.py</code> on your own computer (see the README).</div>
   <section id="v-upload">
-    <h2>Upload your catalogue</h2>
-    <div class="drop" id="drop">
-      <div class="big" aria-hidden="true">📂</div>
-      <p>A CSV file with a header row naming the <b>time</b>, <b>longitude</b>, <b>latitude</b> and
-        <b>magnitude</b> columns, in any order.</p>
-      <p class="small">Common names work, like <code>origin_time</code>, <code>lat</code>, <code>lon</code>,
-        <code>mag</code>. Depth is optional and other columns are ignored. Times without a time zone are read as UTC.</p>
-      <label class="filebtn">Choose a CSV file<input type="file" id="file" accept=".csv,.txt,text/csv"></label>
-      <p class="small">or drop it here. It stays in your browser until you press Process.</p>
-      <button id="sample">Try the sample catalogue</button>
-    </div>
-    <div id="saved" hidden>
-      <h3>Or open a saved analysis</h3>
+    <details class="sec notice" id="demo-banner" hidden><summary>Demo site</summary>
+      <p class="small">Site demo warning: this GitHub Pages site is just
+      a mockup to test UI as a personal project, with two example fits of Indonesian data below.
+      To run your own fits, start <code>server.py</code> on your own computer (see the README).</p></details>
+    <details class="sec" open><summary>Upload your catalogue</summary>
+      <p class="small">A CSV file with a header row naming the <b>time</b>, <b>longitude</b>, <b>latitude</b> and
+        <b>magnitude</b> columns, in any order. Common names work, like <code>origin_time</code>, <code>lat</code>, <code>lon</code>,
+        <code>mag</code>. Depth is optional and other columns are ignored. Times without a time zone are read as UTC.
+        The file stays in your browser until you press Process.</p>
+      <div class="drop" id="drop">
+        <div class="big" aria-hidden="true">📂</div>
+        <label class="filebtn">Choose a CSV file<input type="file" id="file" accept=".csv,.txt,text/csv"></label>
+        <p class="small">or drop it here</p>
+        <button id="sample">Try the sample catalogue</button>
+      </div>
+    </details>
+    <details class="sec" id="saved" hidden><summary>Open a saved analysis</summary>
       <ul class="report" id="saved-list"></ul>
-    </div>
-    <h3>Or open a result file</h3>
-    <p class="small">A <code>result.json</code> from steqpy (<code>write_outputs</code>) or from a local server's job
-      folder, e.g. one a collaborator sent you. It stays in your browser.</p>
-    <label class="filebtn">Choose result.json<input type="file" id="result-file" accept=".json,application/json"></label>
-    <p class="notice" id="result-err" hidden></p>
+    </details>
+    <details class="sec"><summary>Open a result file</summary>
+      <p class="small">A <code>result.json</code> from steqpy (<code>write_outputs</code>) or from a local server's job
+        folder, e.g. one a collaborator sent you. It stays in your browser.</p>
+      <label class="filebtn">Choose result.json<input type="file" id="result-file" accept=".json,application/json"></label>
+      <p class="notice" id="result-err" hidden></p>
+    </details>
     <div id="report" hidden>
       <h2>File check</h2>
       <ul class="report" id="report-list"></ul>
@@ -323,24 +337,23 @@ td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
 
   <section id="v-results" hidden>
     <h2>Results</h2>
-    <div class="checks" id="jit-checks"></div>
-    <div class="checks" id="checks"></div>
+    <div id="jit-checks"></div>
+    <div id="checks"></div>
     <div id="fit-status"></div>
     <div id="res-body">
-      <div class="blob">
-      <div class="blob-h">Study events by P(aftershock): P &lt; 0.1, 0.1 ≤ P ≤ 0.9, P &gt; 0.9</div>
+      <details class="sec"><summary>Study events</summary>
+      <p class="small">By P(aftershock): P &lt; 0.1, 0.1 ≤ P ≤ 0.9, P &gt; 0.9</p>
       <div class="tiles tiles3">
         <div class="tile"><div class="lab"><span class="dot" style="background:#d8dade;border:0.5px solid #26323d"></span>Background</div><div class="num" id="n-bg"></div><div class="small" id="pc-bg"></div></div>
         <div class="tile"><div class="lab"><span class="dot" style="background:#6388c6"></span>Uncertain</div><div class="num" id="n-unc"></div><div class="small" id="pc-unc"></div></div>
         <div class="tile"><div class="lab"><span class="dot" style="background:#15395b"></span>Aftershock</div><div class="num" id="n-aft"></div><div class="small" id="pc-aft"></div></div>
       </div>
-      </div>
-      <div class="checks expected">
-        <strong>Expected numbers</strong>
+      </details>
+      <details class="sec expected"><summary>Expected numbers</summary>
+        <p class="small">Sums of the probabilities over the study events</p>
         <div><span><b id="n-exp-bg"></b> background</span><span><b id="n-exp-aft"></b> aftershocks</span></div>
-        <div class="small">Sums of the probabilities over the study events</div>
-      </div>
-      <h3>Show on map</h3>
+      </details>
+      <details class="sec"><summary>Show on map</summary>
       <div class="fieldlab" id="inc-lab">Study events</div>
       <div class="seg" role="group" aria-labelledby="inc-lab">
         <button data-show="all" aria-pressed="true">All</button>
@@ -364,17 +377,18 @@ td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
           <div class="ticks" id="bg-min-ticks"></div>
         </div>
       </div>
-      <h3>Histogram of event aftershock probability</h3>
+      </details>
+      <details class="sec"><summary>Histogram of P(aftershock)</summary>
       <div id="hist"><div id="tip" hidden></div></div>
       <button class="dl" id="hist-dl">Download PNG</button>
       <details><summary class="small">Show as a table</summary><table id="hist-table"></table></details>
-      <h3>Fitted parameters</h3>
+      </details>
+      <details class="sec"><summary>Fitted parameters</summary>
       <table><tbody id="params"></tbody></table>
       <p class="small" id="params-note"></p>
+      </details>
     </div>
-    <h3>Save these results</h3>
-    <p class="small">A file anyone can open on this site with "Open a result file" (it doesn't need a server).</p>
-    <div class="row" id="save-row"><input type="text" id="save-name" value="result.json" aria-label="File name"><button id="save-json">Download result file</button></div>
+    <button id="save-json" style="margin-top:16px">Save results</button>
     <button id="restart" style="margin-top:16px">Start again</button>
   </section>
 </aside>
@@ -392,7 +406,9 @@ const BILBAO = ["#ffffff", "#eaeaea", "#d7d7d3", "#cac7bc", "#c2bca6", "#bbb291"
 // Demo (DEMO_HOST, no server answering, e.g. GitHub Pages): real sample catalogue and stored fits,
 // no new fits. Opened as a file: the old mockup with made-up data, to judge the layout.
 let API = false;
-const DEMO_HOST = location.protocol.startsWith("http");
+// ?mock in the URL (e.g. http://127.0.0.1:8765/?mock): the made-up mockup even when served, to review all four steps.
+const MOCK = new URLSearchParams(location.search).has("mock");
+const DEMO_HOST = !MOCK && location.protocol.startsWith("http");
 const SAMPLE_CSV = "examples/isc_indonesia_mw.csv";
 let usingSample = false;
 const T0 = Date.UTC(1990, 0, 1), DAY = 864e5, SPAN = 13149; // sample catalogue: 36 years in days
@@ -417,14 +433,14 @@ function makeEvents() {
     const s = rnd() * (fault.length - 1), k = Math.floor(s), f = s - k;
     const spread = rnd() < 0.25 ? 0.9 : 0.22;
     ev.push({ lon: fault[k][0] + (fault[k + 1][0] - fault[k][0]) * f + gauss() * spread, lat: fault[k][1] + (fault[k + 1][1] - fault[k][1]) * f + gauss() * spread,
-      m: mag(), t: T0 + rnd() * SPAN * DAY, p: Math.pow(rnd(), 0.3) });
+      m: mag(), t: T0 + rnd() * SPAN * DAY, p: 1 - 0.6 * Math.pow(rnd(), 3) });   // mostly background
   }
   const clusters = [[-117.58, 35.75, 5000, 10780, 7.1], [-116.5, 34.35, 3500, 900, 7.0], [-118.55, 34.25, 1500, 1480, 6.7], [-121.85, 37.05, 1000, 100, 6.8], [-116.27, 34.6, 1000, 3570, 7.0]];
   for (const [lon, lat, n, t0, top] of clusters) {
     ev.push({ lon, lat, m: top, t: T0 + t0 * DAY, p: 0.93 });
     for (let i = 0; i < n; i++) {
       const along = gauss() * 0.14, across = gauss() * 0.035;
-      ev.push({ lon: lon + along * 0.6 + across, lat: lat - along * 0.8 + across, m: mag(), t: T0 + Math.min(t0 + -Math.log(1 - rnd()) * 400, SPAN) * DAY, p: 0.9 * Math.pow(rnd(), 3.5) });
+      ev.push({ lon: lon + along * 0.6 + across, lat: lat - along * 0.8 + across, m: mag(), t: T0 + Math.min(t0 + -Math.log(1 - rnd()) * 400, SPAN) * DAY, p: 0.15 * Math.pow(rnd(), 2) });   // mostly aftershocks
     }
   }
   return ev.sort((a, b) => a.m - b.m);
@@ -601,13 +617,13 @@ function drawCompleteness(events) {
   const mcs = s.mc.map(p => p.mc).filter(v => isFinite(v)), mlo = Math.floor(Math.min(...mcs, 0)), mhi = Math.ceil(Math.max(...mcs, 1));
   const ym = v => H - B - (v - mlo) / (mhi - mlo || 1) * (H - B - TOP);
   let g = "";
-  for (let k = 0; k <= dec; k++) g += `<line x1="${L}" x2="${W - Rr}" y1="${yc(10 ** k)}" y2="${yc(10 ** k)}" stroke="${k ? "#eae4d6" : "#cfc8b8"}"/><text x="${L - 5}" y="${yc(10 ** k) + 4}" text-anchor="end" font-size="10" fill="#55616c">${fmt(10 ** k)}</text>`;
+  for (let k = 0; k <= dec; k++) g += `<line x1="${L}" x2="${W - Rr}" y1="${yc(10 ** k)}" y2="${yc(10 ** k)}" stroke="${k ? "#eae4d6" : "#cfc8b8"}"/><text x="${L - 5}" y="${yc(10 ** k) + 4}" text-anchor="end" font-size="10" fill="#000">${fmt(10 ** k)}</text>`;
   s.counts.forEach((c, b) => { const x0 = x(s.t0 + b * s.QUARTER), w = Math.max((W - L - Rr) / s.counts.length - 0.5, 0.5); if (c) g += `<rect x="${x0}" y="${yc(c)}" width="${w}" height="${yc(0) - yc(c)}" fill="#cfc8b8"/>`; });
   for (let v = mlo; v <= mhi; v += Math.max(1, Math.round((mhi - mlo) / 4))) g += `<text x="${W - Rr + 5}" y="${ym(v) + 4}" font-size="10" fill="#5a55c8">${v}</text>`;
   for (const p of s.mc) if (isFinite(p.mc)) g += `<circle cx="${x(p.t)}" cy="${ym(p.mc)}" r="2.2" fill="#5a55c8"><title>${dateOf(p.t)}: Mc ${p.mc.toFixed(1)}</title></circle>`;
   const y0 = new Date(s.t0).getUTCFullYear(), y1 = new Date(t1).getUTCFullYear(), step = Math.max(1, Math.ceil((y1 - y0) / 6 / 5) * 5);
-  for (let y = Math.ceil(y0 / step) * step; y <= y1; y += step) { const xx = x(Date.UTC(y, 0, 1)); if (xx >= L && xx <= W - Rr) g += `<text x="${xx}" y="${H - B + 14}" text-anchor="middle" font-size="10" fill="#55616c">${y}</text>`; }
-  g += `<text x="12" y="${(H - B + TOP) / 2}" font-size="10" fill="#55616c" transform="rotate(-90 12 ${(H - B + TOP) / 2})" text-anchor="middle">events / 3 months</text>`;
+  for (let y = Math.ceil(y0 / step) * step; y <= y1; y += step) { const xx = x(Date.UTC(y, 0, 1)); if (xx >= L && xx <= W - Rr) g += `<text x="${xx}" y="${H - B + 14}" text-anchor="middle" font-size="10" fill="#000">${y}</text>`; }
+  g += `<text x="12" y="${(H - B + TOP) / 2}" font-size="10" fill="#000" transform="rotate(-90 12 ${(H - B + TOP) / 2})" text-anchor="middle">events / 3 months</text>`;
   g += `<text x="${W - 6}" y="${(H - B + TOP) / 2}" font-size="10" fill="#5a55c8" transform="rotate(90 ${W - 6} ${(H - B + TOP) / 2})" text-anchor="middle">Mc</text>`;
   g += `<circle id="mc-hl" r="4" fill="none" stroke="#5a55c8" stroke-width="1.5" visibility="hidden"/>`;
   $("mc-plot").innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Events per 3 months and completeness magnitude over time">${g}</svg><div class="tipbox" id="mc-tip" hidden></div>`;
@@ -965,6 +981,7 @@ function setResultData() {
 // A made-up result in the same shape, for the page opened as a file.
 function fakeResult() {
   const mc = +$("mc").value, inT = new Set(targets), pa = targets.map(e => 1 - e.p);
+  const c = state.corners, lon0 = c.reduce((a, q) => a + q[0], 0) / c.length, lat0 = c.reduce((a, q) => a + q[1], 0) / c.length;
   const edges = Array.from({ length: 21 }, (_, i) => i / 20), counts = new Array(20).fill(0);
   for (const v of pa) counts[Math.min(Math.floor(v * 20), 19)]++;
   return {
@@ -974,8 +991,11 @@ function fakeResult() {
       certain_aftershock: pa.filter(v => v > 0.9).length, expected_background: pa.reduce((a, v) => a + 1 - v, 0),
       expected_aftershocks: pa.reduce((a, v) => a + v, 0), histogram_p_aftershock: { edges, counts } },
     events: { lon: EVENTS.map(e => e.lon), lat: EVENTS.map(e => e.lat), t_days: EVENTS.map(e => e.t / DAY), mag_cutoff: mc,
-      mag_above_cutoff: EVENTS.map(e => e.m - mc), target: EVENTS.map(e => inT.has(e) ? 1 : 0), p_background: EVENTS.map(e => e.p) },
-    region: { polygon: state.corners }, projection: null, request: { t0_ms: 0 } };
+      mag_above_cutoff: EVENTS.map(e => e.m - mc), target: EVENTS.map(e => inT.has(e) ? 1 : 0), p_background: EVENTS.map(e => e.p),
+      bandwidth: EVENTS.map(e => 0.02 + 0.2 * e.p) },             // degrees; wider for background events, as in sparse areas
+    region: { polygon: state.corners }, projection: { kind: "laea", lon0, lat0 },
+    background: { mu: 0.62, T_days: Math.max((dateMs("to") - dateMs("from")) / DAY, 1) },
+    request: { t0_ms: 0, jitter: jitterSettings() } };
 }
 
 function showResults(r) {
@@ -994,14 +1014,14 @@ function showResults(r) {
   // steqpy's failure messages (check_fit) mapped to rows; any other failure gets its own row
   const has = k => failed.some(x => x.includes(k));
   const known = ["not finite", "integral of lambda", "the kernel needs both above 1"];
-  $("checks").innerHTML = "<strong>Sanity checks</strong><table>" +
+  $("checks").innerHTML = `<details class="sec checks"${ok ? "" : " open"}><summary>Sanity checks</summary><table>` +
     ckRow(`p &gt; 1 <span class="small">(${p.toPrecision(3)})</span>`, p > 1) +
     ckRow(`q &gt; 1 <span class="small">(${q.toPrecision(3)})</span>`, q > 1) +
     ckRow("Finite parameters and likelihood", !has("not finite")) +
     ckRow("Integral of λ matches the event count", !has("integral of lambda")) +
-    failed.filter(x => !known.some(k => x.includes(k))).map(x => ckRow(esc(x), false)).join("") + "</table>";
+    failed.filter(x => !known.some(k => x.includes(k))).map(x => ckRow(esc(x), false)).join("") + "</table></details>";
   const j = (r.request && r.request.jitter) || {}, jr = [["Longitude", j.lon, "°"], ["Latitude", j.lat, "°"], ["Time", j.t_s, " s"], ["Magnitude", j.mag, ""]];
-  $("jit-checks").innerHTML = `<strong>Jitter${jr.some(x => x[1]) ? ` <span class="small">(seed ${esc(j.seed)})</span>` : ""}</strong><table>` +
+  $("jit-checks").innerHTML = `<details class="sec checks"><summary>Jitter${jr.some(x => x[1]) ? ` <span class="small">(seed ${esc(j.seed)})</span>` : ""}</summary><table>` +
     jr.map(([n, v, u]) => ckRow(n, !!v, `<td class="small">${!v ? "" : v === "precision" ? "± half its last decimal" : `± ${esc(+(+v).toPrecision(3))}${u}`}</td>`, "off")).join("") + "</table>";
   $("fit-status").innerHTML = ok
     ? (f.converged === false ? `<div class="notice">⚠️ Not converged: the fit stopped at its iteration limit, so the numbers may still move a little.</div>` : "") +
@@ -1069,13 +1089,12 @@ function downloadHist() {
 }
 
 // The shown result as JSON, without what the page added to it (map features, background grid).
-const PAGE_ONLY = new Set(["features", "stars", "bg", "bgGrid", "bgBusy"]);
+const PAGE_ONLY = new Set(["features", "stars", "bg", "bgBusy"]);
 function saveResult() {
   if (!R) return;
-  let name = $("save-name").value.trim().replace(/[\\/:*?"<>|]+/g, "_") || "result.json";
-  if (!/\.json$/i.test(name)) name += ".json";
+  // the browser's "Save as" dialog picks the name and folder (Firefox, Safari: result.json in Downloads)
   saveBlob(new Blob([JSON.stringify(R, (k, v) => PAGE_ONLY.has(k) ? undefined : v)], { type: "application/json" }),
-    name, "Result file", { "application/json": [".json"] });
+    "result.json", "Result file", { "application/json": [".json"] });
 }
 // Save with a "Save as" dialog where the browser has one (Chrome, Edge: showSaveFilePicker);
 // elsewhere (Firefox, Safari) a normal download, which asks only if the browser is set to ask.
@@ -1103,7 +1122,7 @@ function drawHist(h) {
   let s = "";
   for (const f of [0, 0.5, 1]) {
     const v = top * f;
-    s += `<line x1="${L}" x2="${W - Rm}" y1="${y(v)}" y2="${y(v)}" stroke="${f ? "#eae4d6" : "#cfc8b8"}"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="#55616c">${fmt(v)}</text>`;
+    s += `<line x1="${L}" x2="${W - Rm}" y1="${y(v)}" y2="${y(v)}" stroke="${f ? "#eae4d6" : "#cfc8b8"}"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="#000">${fmt(v)}</text>`;
   }
   bins.forEach((c, i) => {
     const lo = h.edges[i], mid = (h.edges[i] + h.edges[i + 1]) / 2, px = x(lo) + 1, w = bw - 2;
@@ -1113,9 +1132,9 @@ function drawHist(h) {
     s += `<rect x="${x(lo)}" y="${TOP}" width="${bw}" height="${H - B - TOP}" fill="transparent" data-i="${i}"/>`;
   });
   for (const b of [0.1, 0.9]) s += `<line x1="${x(b)}" x2="${x(b)}" y1="${TOP - 3}" y2="${y(0)}" stroke="#26323d" stroke-dasharray="3 3" pointer-events="none"/><text x="${x(b)}" y="${TOP - 6}" text-anchor="middle" font-size="10" fill="#26323d">${b}</text>`;
-  for (const f of [0, 0.25, 0.5, 0.75, 1]) s += `<text x="${x(f)}" y="${H - B + 15}" text-anchor="middle" font-size="11" fill="#55616c">${f}</text>`;
-  s += `<text x="${(L + W - Rm) / 2}" y="${H - 3}" text-anchor="middle" font-size="11" fill="#55616c">P(aftershock)</text>`;
-  s += `<text transform="translate(10 ${(TOP + H - B) / 2}) rotate(-90)" text-anchor="middle" font-size="11" fill="#55616c">Counts</text>`;
+  for (const f of [0, 0.25, 0.5, 0.75, 1]) s += `<text x="${x(f)}" y="${H - B + 15}" text-anchor="middle" font-size="11" fill="#000">${f}</text>`;
+  s += `<text x="${(L + W - Rm) / 2}" y="${H - 3}" text-anchor="middle" font-size="11" fill="#000">P(aftershock)</text>`;
+  s += `<text transform="translate(10 ${(TOP + H - B) / 2}) rotate(-90)" text-anchor="middle" font-size="11" fill="#000">Counts</text>`;
   const box = $("hist"), tip = $("tip");
   box.querySelector("svg")?.remove();
   box.insertAdjacentHTML("afterbegin", `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Histogram of P(aftershock)">${s}</svg>`);
@@ -1140,42 +1159,126 @@ function drawHist(h) {
 // mu * u(x) = mu / T * sum_j phi_j exp(-r^2 / (2 h_j^2)) / (2 pi h_j^2), r in steqpy's model
 // coordinates (laea at the polygon centroid, or flat), Gaussian cut at 6 h_j (relative error
 // ~1e-8; checked against steqpy's rates.dat to 2e-6, its print precision). Grid rows are spaced
-// evenly in Web Mercator, so the image lines up with the map. Runs in a Web Worker.
+// evenly in Web Mercator, so a grid lines up with the map. Runs in Web Workers that get the
+// events once ("init"), then one grid per message: the 400-cell overview (sets the colour range)
+// and 256 px map tiles, computed only when MapLibre asks for them (so zooming in stays sharp).
 const BG_WORKER = `
 const RAD = Math.PI / 180, R0 = 180 / Math.PI;
-onmessage = ({ data: d }) => {
-  const s0 = Math.sin(d.lat0 * RAD), c0 = Math.cos(d.lat0 * RAD), cf = Math.cos(d.lat0 * RAD);
-  const proj = d.kind === "flat" ? (lon, lat) => [lon * cf, lat] : (lon, lat) => {
-    const lam = (lon - d.lon0) * RAD, ph = lat * RAD, sp = Math.sin(ph), cp = Math.cos(ph), cl = Math.cos(lam);
-    const k = Math.sqrt(2 / (1 + s0 * sp + c0 * cp * cl));
-    return [R0 * k * cp * Math.sin(lam), R0 * k * (c0 * sp - s0 * cp * cl)];
-  };
-  const merc = lat => Math.log(Math.tan(Math.PI / 4 + lat * RAD / 2)), yN = merc(d.n), yS = merc(d.s);
-  const nx = d.nx, ny = d.ny, colLon = i => d.w + (d.e - d.w) * (i + 0.5) / nx;
+let d = null, proj = null;
+onmessage = ({ data: q }) => {
+  if (q.init) {
+    d = q;
+    const s0 = Math.sin(d.lat0 * RAD), c0 = Math.cos(d.lat0 * RAD), cf = Math.cos(d.lat0 * RAD);
+    proj = d.kind === "flat" ? (lon, lat) => [lon * cf, lat] : (lon, lat) => {
+      const lam = (lon - d.lon0) * RAD, ph = lat * RAD, sp = Math.sin(ph), cp = Math.cos(ph), cl = Math.cos(lam);
+      const k = Math.sqrt(2 / (1 + s0 * sp + c0 * cp * cl));
+      return [R0 * k * cp * Math.sin(lam), R0 * k * (c0 * sp - s0 * cp * cl)];
+    };
+    return;
+  }
+  const merc = lat => Math.log(Math.tan(Math.PI / 4 + lat * RAD / 2)), yN = merc(q.n), yS = merc(q.s);
+  const nx = q.nx, ny = q.ny, colLon = i => q.w + (q.e - q.w) * (i + 0.5) / nx;
   const rowLat = r => Math.atan(Math.sinh(yN - (yN - yS) * (r + 0.5) / ny)) * R0;
   const gx = new Float64Array(nx * ny), gy = new Float64Array(nx * ny), out = new Float64Array(nx * ny);
   for (let r = 0; r < ny; r++) for (let i = 0; i < nx; i++) { const [x, y] = proj(colLon(i), rowLat(r)); gx[r * nx + i] = x; gy[r * nx + i] = y; }
   const rowOf = lat => (yN - merc(Math.max(-85, Math.min(85, lat)))) / (yN - yS) * ny - 0.5;
   for (let j = 0; j < d.lon.length; j++) {
     const h = d.h[j], rc = 6 * h, rc2 = rc * rc, w = d.phi[j] / (2 * Math.PI * h * h), inv = -0.5 / (h * h);
-    const [xj, yj] = proj(d.lon[j], d.lat[j]);
     const la = rc * 1.1, lo = la / Math.max(Math.cos(d.lat[j] * RAD), 0.05);
-    const i0 = Math.max(0, Math.floor((d.lon[j] - lo - d.w) / (d.e - d.w) * nx - 0.5)), i1 = Math.min(nx - 1, Math.ceil((d.lon[j] + lo - d.w) / (d.e - d.w) * nx - 0.5));
+    const i0 = Math.max(0, Math.floor((d.lon[j] - lo - q.w) / (q.e - q.w) * nx - 0.5)), i1 = Math.min(nx - 1, Math.ceil((d.lon[j] + lo - q.w) / (q.e - q.w) * nx - 0.5));
     const r0 = Math.max(0, Math.floor(rowOf(d.lat[j] + la))), r1 = Math.min(ny - 1, Math.ceil(rowOf(d.lat[j] - la)));
+    if (i0 > i1 || r0 > r1) continue;                   // this event's Gaussian misses the grid
+    const [xj, yj] = proj(d.lon[j], d.lat[j]);
     for (let r = r0; r <= r1; r++) for (let i = i0; i <= i1; i++) {
       const c = r * nx + i, dx = gx[c] - xj, dy = gy[c] - yj, d2 = dx * dx + dy * dy;
       if (d2 < rc2) out[c] += w * Math.exp(d2 * inv);
     }
   }
-  postMessage(out, [out.buffer]);
+  const res = q.f32 ? Float32Array.from(out) : out;
+  postMessage({ id: q.id, out: res }, [res.buffer]);
 };`;
-let bgWorker = null;
 function hexRgb(h) { return [1, 3, 5].map(k => parseInt(h.slice(k, k + 2), 16)); }
 const BILBAO_RGB = BILBAO.map(hexRgb);
 function bilbao(f) {                  // f in [0, 1] -> [r, g, b]
   const x = Math.min(Math.max(f, 0), 1) * (BILBAO_RGB.length - 1), k = Math.min(Math.floor(x), BILBAO_RGB.length - 2), u = x - k;
   return BILBAO_RGB[k].map((v, c) => Math.round(v + (BILBAO_RGB[k + 1][c] - v) * u));
 }
+
+// Worker pool: one queue, each idle worker takes the next grid. Tiles MapLibre no longer wants
+// (aborted) are dropped from the queue; a running one finishes and goes into the cache anyway.
+const BG_POOL = Math.min(4, Math.max(1, (navigator.hardwareConcurrency || 4) - 1));
+let bgWorkers = [], bgIdle = [], bgQueue = [], bgJobs = new Map(), bgJobId = 0;
+function bgStart(ev, projection) {
+  for (const w of bgWorkers) w.terminate();
+  for (const j of bgQueue) j.reject(new Error("stale"));
+  for (const j of bgJobs.values()) j.reject(new Error("stale"));
+  bgQueue = []; bgJobs = new Map();
+  const url = URL.createObjectURL(new Blob([BG_WORKER], { type: "text/javascript" }));
+  bgWorkers = Array.from({ length: BG_POOL }, () => {
+    const w = new Worker(url);
+    w.postMessage({ init: true, lon: ev.lon, lat: ev.lat, phi: ev.p_background, h: ev.bandwidth,
+      kind: projection.kind, lon0: projection.lon0, lat0: projection.lat0 });
+    w.onmessage = ({ data }) => {
+      const j = bgJobs.get(data.id);
+      bgJobs.delete(data.id);
+      bgIdle.push(w);
+      if (j) j.resolve(data.out);
+      bgPump();
+    };
+    return w;
+  });
+  bgIdle = [...bgWorkers];
+}
+function bgRun(box, signal) {
+  return new Promise((resolve, reject) => { bgQueue.push({ box, signal, resolve, reject }); bgPump(); });
+}
+function bgPump() {
+  while (bgIdle.length && bgQueue.length) {
+    const j = bgQueue.shift();
+    if (j.signal && j.signal.aborted) { j.reject(new DOMException("aborted", "AbortError")); continue; }
+    const id = ++bgJobId;
+    bgJobs.set(id, j);
+    bgIdle.pop().postMessage({ ...j.box, id });
+  }
+}
+
+// Map tiles: bgrate://{generation}.{style version}/{z}/{x}/{y}. A new result bumps the generation
+// (new cache); a colour change bumps the version, so MapLibre re-asks and the tile is recoloured
+// from the cached raw rates without recomputing.
+const BG_TILE = 256, BG_CACHE_MAX = 300;        // ~256 KB per cached tile (Float32)
+let bgGen = 0, bgVer = 0, bgSourceGen = -1, bgCache = new Map(), bgStyle = null;
+function tileBox(z, x, y) {
+  const n2 = Math.pow(2, z), lat = k => Math.atan(Math.sinh(Math.PI * (1 - 2 * k / n2))) * 180 / Math.PI;
+  return { w: x / n2 * 360 - 180, e: (x + 1) / n2 * 360 - 180, n: lat(y), s: lat(y + 1), nx: BG_TILE, ny: BG_TILE, f32: true };
+}
+async function colourTile(raw) {
+  const { lo, hi, log, thr, toUnit } = bgStyle, L0 = Math.log10(lo), L1 = Math.log10(hi);
+  const cv = new OffscreenCanvas(BG_TILE, BG_TILE), ctx = cv.getContext("2d"), img = ctx.createImageData(BG_TILE, BG_TILE);
+  for (let c = 0; c < raw.length; c++) {
+    const v = raw[c] * toUnit;
+    if (!(v >= thr)) continue;
+    const [rr, gg, bb] = BG_LUT[Math.round(255 * Math.min(Math.max(log ? (Math.log10(v) - L0) / (L1 - L0) : v / hi, 0), 1))];
+    const o = 4 * c;
+    img.data[o] = rr; img.data[o + 1] = gg; img.data[o + 2] = bb; img.data[o + 3] = 220;
+  }
+  ctx.putImageData(img, 0, 0);
+  return (await cv.convertToBlob({ type: "image/png" })).arrayBuffer();
+}
+const BG_LUT = Array.from({ length: 256 }, (_, k) => bilbao(k / 255));
+if (window.maplibregl) maplibregl.addProtocol("bgrate", async (params, abort) => {
+  const m = params.url.match(/^bgrate:\/\/(\d+)\.\d+\/(\d+)\/(\d+)\/(\d+)$/);
+  if (!m || +m[1] !== bgGen || !bgStyle) throw new Error("stale tile");
+  const key = `${m[2]}/${m[3]}/${m[4]}`;
+  let raw = bgCache.get(key);
+  if (!raw) {
+    raw = await bgRun(tileBox(+m[2], +m[3], +m[4]), abort.signal);
+    if (+m[1] !== bgGen) throw new Error("stale tile");
+    bgCache.set(key, raw);
+    if (bgCache.size > BG_CACHE_MAX) bgCache.delete(bgCache.keys().next().value);   // oldest first
+  } else { bgCache.delete(key); bgCache.set(key, raw); }                          // most recent last
+  return { data: await colourTile(raw) };
+});
+
 function showBackground(on) {
   if (!state.loaded || !R || !R.projection) return;
   if (map.getLayer("bgrate")) map.setLayoutProperty("bgrate", "visibility", on ? "visible" : "none");
@@ -1191,52 +1294,45 @@ function showBackground(on) {
   const merc = lat => Math.log(Math.tan(Math.PI / 4 + lat * Math.PI / 360));
   const aspect = (merc(n) - merc(s)) / ((e - w) * Math.PI / 180), MAXN = 400;
   const nx = aspect > 1 ? Math.round(MAXN / aspect) : MAXN, ny = aspect > 1 ? MAXN : Math.round(MAXN * aspect);
-  const ev = R.events, t0 = performance.now();
-  if (!bgWorker) bgWorker = new Worker(URL.createObjectURL(new Blob([BG_WORKER], { type: "text/javascript" })));
-  bgWorker.onmessage = ({ data: out }) => {
+  const forR = R, t0 = performance.now();
+  bgGen++; bgCache = new Map(); bgStyle = null;
+  bgStart(R.events, R.projection);
+  bgRun({ w, e, s, n, nx, ny }).then(out => {
+    if (forR !== R) return;
     const toUnit = R.background.mu / R.background.T_days * 365.25 * 1e4 / (KM_PER_DEG * KM_PER_DEG);  // events / yr / 10,000 km^2
     // colour range (log scale): max inside the polygon down to its 5th percentile, at most 4 decades
-    const inside = [];
-    const mercY = lat => merc(lat), yN = mercY(n), yS = mercY(s);
+    const inside = [], yN = merc(n), yS = merc(s);
     for (let r = 0; r < ny; r++) {
       const lat = Math.atan(Math.sinh(yN - (yN - yS) * (r + 0.5) / ny)) * 180 / Math.PI;
       for (let i = 0; i < nx; i++) if (inPoly(w + (e - w) * (i + 0.5) / nx, lat, poly)) inside.push(out[r * nx + i] * toUnit);
     }
     inside.sort((a, b) => a - b);
     const hi = inside.at(-1) || 1, lo = Math.max(inside[Math.floor(inside.length * 0.05)] || 0, hi * 1e-4);
-    const cv = document.createElement("canvas");
-    cv.width = nx; cv.height = ny;
-    R.bg = { lo, hi };
-    R.bgGrid = { out, toUnit, nx, ny, cv, coordinates: [[w, n], [e, n], [e, s], [w, s]] };
+    R.bg = { lo, hi, toUnit, bounds: [w, s, e, n] };
     R.bgBusy = false;
     paintBg();
-    $("bg-status").textContent = `${nx} × ${ny} grid, computed in ${Math.round(performance.now() - t0)} ms`;
+    $("bg-status").textContent = `Range from a ${nx} × ${ny} grid (${Math.round(performance.now() - t0)} ms); sharper tiles load as you zoom`;
     showBackground($("bg-toggle").checked);
-  };
-  bgWorker.postMessage({ lon: ev.lon, lat: ev.lat, phi: ev.p_background, h: ev.bandwidth, kind: R.projection.kind,
-    lon0: R.projection.lon0, lat0: R.projection.lat0, w, e, s, n, nx, ny });
+  }).catch(() => {});
 }
 
-// Draw the computed background grid: colour range lo..hi (log or linear), cells below the
-// slider's threshold left transparent. The slider is log-spaced over lo..hi in both scales.
+// Colour the background tiles: range lo..hi (log or linear), cells below the slider's threshold
+// left transparent. The slider is log-spaced over lo..hi in both scales.
 function paintBg() {
-  const g = R && R.bgGrid;
-  if (!g || !state.loaded) return;
-  const { lo, hi } = R.bg, log = $("bg-log").checked, L0 = Math.log10(lo), L1 = Math.log10(hi);
+  if (!R || !R.bg || !state.loaded) return;
+  const { lo, hi, toUnit } = R.bg, log = $("bg-log").checked, L0 = Math.log10(lo), L1 = Math.log10(hi);
   const f = +$("bg-min").value / 1000, thr = lo * Math.pow(hi / lo, f);
-  const ctx = g.cv.getContext("2d"), img = ctx.createImageData(g.nx, g.ny);
-  for (let c = 0; c < g.out.length; c++) {
-    const v = g.out[c] * g.toUnit;
-    if (!(v >= thr)) continue;
-    const [rr, gg, bb] = bilbao(log ? (Math.log10(v) - L0) / (L1 - L0) : v / hi);
-    img.data.set([rr, gg, bb, 220], 4 * c);
-  }
-  ctx.putImageData(img, 0, 0);
-  const url = g.cv.toDataURL();
-  if (map.getSource("bgrate")) map.getSource("bgrate").updateImage({ url, coordinates: g.coordinates });
+  bgStyle = { lo, hi, log, thr, toUnit };
+  const url = `bgrate://${bgGen}.${++bgVer}/{z}/{x}/{y}`;
+  if (map.getSource("bgrate") && bgSourceGen === bgGen) map.getSource("bgrate").setTiles([url]);
   else {
-    map.addSource("bgrate", { type: "image", url, coordinates: g.coordinates });
-    map.addLayer({ id: "bgrate", type: "raster", source: "bgrate", paint: { "raster-opacity": 0.85, "raster-resampling": "linear", "raster-fade-duration": 0 } }, "events");
+    if (map.getLayer("bgrate")) map.removeLayer("bgrate");
+    if (map.getSource("bgrate")) map.removeSource("bgrate");
+    // bounds: no tiles asked for outside the padded study box; past maxzoom tiles are stretched
+    map.addSource("bgrate", { type: "raster", tiles: [url], tileSize: BG_TILE, bounds: R.bg.bounds, maxzoom: 13 });
+    map.addLayer({ id: "bgrate", type: "raster", source: "bgrate", layout: { visibility: $("bg-toggle").checked ? "visible" : "none" },
+      paint: { "raster-opacity": 0.85, "raster-resampling": "linear", "raster-fade-duration": 0 } }, "events");
+    bgSourceGen = bgGen;
   }
   const sci = v => v === 0 ? "0" : v >= 0.01 && v < 1000 ? v.toPrecision(2) : v.toExponential(1);
   const ticks = [0, 1, 2, 3].map(k => log ? Math.pow(10, L0 + k * (L1 - L0) / 3) : hi * k / 3);
@@ -1336,6 +1432,7 @@ $("bg-toggle").addEventListener("change", e => showBackground(e.target.checked))
 $("show-outside").addEventListener("change", paintEvents);
 $("hist-dl").onclick = downloadHist;
 $("save-json").onclick = saveResult;
+
 // Redraws are debounced: a new image while MapLibre still loads the last one aborts it (logs an error).
 let bgTimer = null;
 const paintBgSoon = () => { clearTimeout(bgTimer); bgTimer = setTimeout(paintBg, 80); };
@@ -1512,7 +1609,8 @@ if (location.hash.startsWith("#/examples/")) openExample(location.hash.slice(11)
 else if (location.hash.startsWith("#/jobs/") && API) pollJob(location.hash.slice(7));
 else if (location.hash.startsWith("#/jobs/") && DEMO_HOST) {
   setStep("upload");
-  $("demo-banner").insertAdjacentHTML("beforeend", "<br><b>That job link points to someone's own server, so it can't open here.</b>");
+  $("demo-banner").insertAdjacentHTML("beforeend", "<p class=\"small\"><b>That job link points to someone's own server, so it can't open here.</b></p>");
+  $("demo-banner").open = true;
 }
 else if (location.hash.startsWith("#/jobs/")) {
   loadEvents(makeEvents());
