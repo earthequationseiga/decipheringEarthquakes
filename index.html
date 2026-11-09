@@ -143,7 +143,11 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 4px 0; }
 td.sym-p { font-family: "Cambria Math", "STIX Two Math", "Latin Modern Math", "Times New Roman", serif; font-style: italic; font-size: 19px; width: 24px; }
 .indent { margin-left: 26px; }
 #bg-status:empty { display: none; }
+/* colour bar under the threshold slider; inset by about half the thumb so it lines up with the track */
+#bg-min-ramp { height: 10px; margin: 0 8px; border-radius: 5px; border: 0.5px solid var(--axis); }
+#bg-min-ticks { display: flex; justify-content: space-between; margin: 2px 2px 0; font-size: 11px; color: var(--ink-2); }
 label.check.radio { font-weight: 600; font-size: 13px; margin-top: 6px; }
+#save-row input { flex: 1; min-width: 0; font: inherit; padding: 7px 9px; border: 1px solid var(--axis); border-radius: 10px; background: #fff; color: var(--ink); }
 .dl { margin-top: 6px; padding: 6px 12px; font-size: 13px; }
 .seg button[aria-pressed=true] { background: var(--accent); color: #fff; }
 #hist { position: relative; }
@@ -235,6 +239,11 @@ td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
       <h3>Or open a saved analysis</h3>
       <ul class="report" id="saved-list"></ul>
     </div>
+    <h3>Or open a result file</h3>
+    <p class="small">A <code>result.json</code> from steqpy (<code>write_outputs</code>) or from a local server's job
+      folder, e.g. one a collaborator sent you. It stays in your browser.</p>
+    <label class="filebtn">Choose result.json<input type="file" id="result-file" accept=".json,application/json"></label>
+    <p class="notice" id="result-err" hidden></p>
     <div id="report" hidden>
       <h2>File check</h2>
       <ul class="report" id="report-list"></ul>
@@ -351,6 +360,8 @@ td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
           </div>
           <label for="bg-min">Show rates above: <output id="bg-min-out">all</output></label>
           <input type="range" id="bg-min" min="0" max="1000" value="0">
+          <div id="bg-min-ramp" aria-hidden="true"></div>
+          <div class="ticks" id="bg-min-ticks"></div>
         </div>
       </div>
       <h3>Histogram of event aftershock probability</h3>
@@ -361,6 +372,9 @@ td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
       <table><tbody id="params"></tbody></table>
       <p class="small" id="params-note"></p>
     </div>
+    <h3>Save these results</h3>
+    <p class="small">A file anyone can open on this site with "Open a result file" (it doesn't need a server).</p>
+    <div class="row" id="save-row"><input type="text" id="save-name" value="result.json" aria-label="File name"><button id="save-json">Download result file</button></div>
     <button id="restart" style="margin-top:16px">Start again</button>
   </section>
 </aside>
@@ -987,8 +1001,8 @@ function showResults(r) {
     ckRow("Integral of λ matches the event count", !has("integral of lambda")) +
     failed.filter(x => !known.some(k => x.includes(k))).map(x => ckRow(esc(x), false)).join("") + "</table>";
   const j = (r.request && r.request.jitter) || {}, jr = [["Longitude", j.lon, "°"], ["Latitude", j.lat, "°"], ["Time", j.t_s, " s"], ["Magnitude", j.mag, ""]];
-  $("jit-checks").innerHTML = `<strong>Jitter${jr.some(x => x[1]) ? ` <span class="small">(seed ${j.seed})</span>` : ""}</strong><table>` +
-    jr.map(([n, v, u]) => ckRow(n, !!v, `<td class="small">${!v ? "" : v === "precision" ? "± half its last decimal" : `± ${v}${u}`}</td>`, "off")).join("") + "</table>";
+  $("jit-checks").innerHTML = `<strong>Jitter${jr.some(x => x[1]) ? ` <span class="small">(seed ${esc(j.seed)})</span>` : ""}</strong><table>` +
+    jr.map(([n, v, u]) => ckRow(n, !!v, `<td class="small">${!v ? "" : v === "precision" ? "± half its last decimal" : `± ${esc(+(+v).toPrecision(3))}${u}`}</td>`, "off")).join("") + "</table>";
   $("fit-status").innerHTML = ok
     ? (f.converged === false ? `<div class="notice">⚠️ Not converged: the fit stopped at its iteration limit, so the numbers may still move a little.</div>` : "") +
       (f.warnings.length ? `<div class="notice">⚠️ ${f.warnings.map(esc).join("<br>")}</div>` : "")
@@ -1008,7 +1022,7 @@ function showResults(r) {
     $("params").innerHTML = Object.entries(r.params).map(([k, v]) => {
       const scale = k === "D" ? KM_PER_DEG * KM_PER_DEG : 1, val = v === null ? "undefined" : (v * scale).toPrecision(4);
       const err = se[k] != null ? ` ± ${(se[k] * scale).toPrecision(2)}` : "";
-      return `<tr><td class="sym-p">${SYMBOL[k] || k}</td><td><b>${k}</b></td><td class="n">${val}${err}</td><td class="small">${DESCR[k] || ""}</td></tr>`;
+      return `<tr><td class="sym-p">${SYMBOL[k] || esc(k)}</td><td><b>${esc(k)}</b></td><td class="n">${val}${err}</td><td class="small">${DESCR[k] || ""}</td></tr>`;
     }).join("");
     $("params-note").textContent = Object.keys(se).length
       ? "± : standard errors from the Hessian (Wang, Schoenberg & Jackson 2010). They hold the background fixed, so they are too small." : "";
@@ -1056,6 +1070,18 @@ function downloadHist() {
     });
   };
   img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(new XMLSerializer().serializeToString(c));
+}
+
+// The shown result as JSON, without what the page added to it (map features, background grid).
+const PAGE_ONLY = new Set(["features", "stars", "bg", "bgGrid", "bgBusy"]);
+function saveResult() {
+  if (!R) return;
+  let name = $("save-name").value.trim().replace(/[\\/:*?"<>|]+/g, "_") || "result.json";
+  if (!/\.json$/i.test(name)) name += ".json";
+  const blob = new Blob([JSON.stringify(R, (k, v) => PAGE_ONLY.has(k) ? undefined : v)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
 function niceMax(v) { const m = Math.pow(10, Math.floor(Math.log10(v))); for (const k of [1, 2, 5, 10]) if (k * m >= v) return k * m; return v; }
@@ -1203,6 +1229,14 @@ function paintBg() {
   const sci = v => v === 0 ? "0" : v >= 0.01 && v < 1000 ? v.toPrecision(2) : v.toExponential(1);
   const ticks = [0, 1, 2, 3].map(k => log ? Math.pow(10, L0 + k * (L1 - L0) / 3) : hi * k / 3);
   $("bg-ticks").innerHTML = ticks.map(t => `<span>${sci(t)}</span>`).join("");
+  // Slider colour bar: the colour each slider position gets on the map (log-spaced positions, so
+  // in linear scale most of it is pale). Labels at the same positions as the log ticks.
+  const stops = Array.from({ length: 25 }, (_, k) => {
+    const pos = k / 24, [r, gg, bb] = bilbao(log ? pos : lo * Math.pow(hi / lo, pos) / hi);
+    return `rgb(${r},${gg},${bb}) ${(100 * pos).toFixed(1)}%`;
+  });
+  $("bg-min-ramp").style.background = `linear-gradient(90deg, ${stops.join(", ")})`;
+  $("bg-min-ticks").innerHTML = [0, 1, 2, 3].map(k => `<span>${sci(lo * Math.pow(hi / lo, k / 3))}</span>`).join("");
   $("bg-min-out").textContent = f ? `${sci(thr)} / yr / 10⁴ km²` : "all";
   $("bg-unit").textContent = `M ≥ ${R.events.mag_cutoff} background events per year per 10,000 km², ${log ? "log" : "linear"} scale` +
     (f ? `; only rates above ${sci(thr)} shown` : "");
@@ -1228,6 +1262,7 @@ function useCatalogue(r, source) {
 }
 async function readFile(file) {
   if (!file) return;
+  if (/\.json$/i.test(file.name)) return openResultFile(file);      // dropped result file
   useCatalogue(readCatalogue(await file.text()), file.name);
 }
 
@@ -1260,6 +1295,7 @@ $("sample").onclick = async () => {
   useCatalogue({ events: makeEvents(), cols: {}, names: null, ignored: [], noDepth: 0, bad: [], missing: [] }, null);
 };
 $("file").addEventListener("change", e => { usingSample = false; readFile(e.target.files[0]); });
+$("result-file").addEventListener("change", e => { if (e.target.files[0]) openResultFile(e.target.files[0]); e.target.value = ""; });
 const drop = $("drop");
 drop.addEventListener("dragover", e => { e.preventDefault(); drop.classList.add("over"); });
 drop.addEventListener("dragleave", () => drop.classList.remove("over"));
@@ -1287,6 +1323,7 @@ $("process").onclick = () => API ? startRealJob() : DEMO_HOST ? demoProcess() : 
 $("bg-toggle").addEventListener("change", e => showBackground(e.target.checked));
 $("show-outside").addEventListener("change", paintEvents);
 $("hist-dl").onclick = downloadHist;
+$("save-json").onclick = saveResult;
 // Redraws are debounced: a new image while MapLibre still loads the last one aborts it (logs an error).
 let bgTimer = null;
 const paintBgSoon = () => { clearTimeout(bgTimer); bgTimer = setTimeout(paintBg, 80); };
@@ -1384,6 +1421,59 @@ async function openExample(file) {
   } catch (err) {
     $("saved").hidden = false;
     $("saved-list").insertAdjacentHTML("beforeend", `<li>⚠️ Couldn't open ${esc(file)}: ${esc(err.message)}</li>`);
+  }
+}
+// A result.json from a file (untrusted: checked before use). Server results carry "request"
+// (t0_ms, jitter); steqpy's own to_dict has events.t0 + events.t_min and "jitter" instead.
+function checkResult(r) {
+  const num = v => typeof v === "number" && isFinite(v);
+  const arr = (a, n, ok = num) => Array.isArray(a) && (n == null || a.length === n) && a.every(ok);
+  if (!r || typeof r !== "object" || !r.fit || !r.params || !r.summary || !r.events || !r.region)
+    throw new Error("not a steqpy result (needs fit, params, summary, events and region)");
+  const e = r.events;
+  if (!Array.isArray(e.lon)) throw new Error(e.x ? "it has model x, y instead of longitude and latitude (fitted without a projection), so it can't be mapped" : "no event coordinates");
+  const n = e.lon.length;
+  if (!n) throw new Error("no events");
+  for (const k of ["lon", "lat", "t_days", "mag_above_cutoff", "target"]) if (!arr(e[k], n)) throw new Error(`events.${k}: needs ${n} numbers`);
+  if (!arr(e.p_background, n, v => v === null || num(v))) throw new Error(`events.p_background: needs ${n} numbers`);
+  if (e.bandwidth != null && !arr(e.bandwidth, n)) throw new Error(`events.bandwidth: needs ${n} numbers`);
+  const poly = r.region.polygon;
+  if (!arr(poly, null, q => Array.isArray(q) && num(q[0]) && num(q[1])) || poly.length < 3) throw new Error("region.polygon: needs 3 or more [lon, lat] corners");
+  for (const [k, v] of Object.entries(r.params)) if (!(v === null || num(v))) throw new Error(`params.${k} is not a number`);
+  if (!num(r.params.p) || !num(r.params.q)) throw new Error("params: no p and q");
+  const h = r.summary.histogram_p_aftershock || {};
+  if (!arr(h.edges) || !arr(h.counts, h.edges.length - 1)) throw new Error("summary.histogram_p_aftershock: needs edges and counts");
+  for (const k of ["n_targets", "certain_background", "uncertain", "certain_aftershock", "expected_background", "expected_aftershocks"])
+    if (!num(r.summary[k])) throw new Error(`summary.${k} is not a number`);
+  r.fit.failed = arr(r.fit.failed, null, x => typeof x === "string") ? r.fit.failed : [];
+  r.fit.warnings = arr(r.fit.warnings, null, x => typeof x === "string") ? r.fit.warnings : [];
+  const jv = v => v == null || v === "precision" || num(v);
+  let dated = true;
+  if (r.request) {
+    const j = r.request.jitter || {};
+    if (!num(r.request.t0_ms) || ![j.lon, j.lat, j.mag, j.t_s, j.seed].every(jv)) throw new Error("request: bad t0_ms or jitter");
+  } else {                                        // straight from steqpy
+    const t0 = typeof e.t0 === "string" ? Date.parse(/[zZ]$|[+-]\d\d:?\d\d$/.test(e.t0) ? e.t0 : e.t0 + "Z") : NaN, j = r.jitter || {};
+    if (![j.lon, j.lat, j.mag, j.t_days, j.seed].every(jv)) throw new Error("jitter: bad values");
+    dated = isFinite(t0);
+    r.request = { t0_ms: (dated ? t0 : 0) + (num(e.t_min) ? e.t_min : 0) * DAY,
+      jitter: { lon: j.lon || 0, lat: j.lat || 0, mag: j.mag || 0, t_s: (j.t_days || 0) * 86400, seed: j.seed || 0 } };
+  }
+  return dated;
+}
+async function openResultFile(file) {
+  const err = $("result-err");
+  err.hidden = true;
+  try {
+    if (file.size > 200e6) throw new Error("the file is over 200 MB");
+    const r = JSON.parse(await file.text());
+    const dated = checkResult(r);
+    history.replaceState(null, "", location.pathname);
+    showResults(r);
+    $("mock-pill").textContent = `Result file: ${file.name}` + (dated ? "" : " (no start date in it: dates count from 1970)");
+  } catch (e) {
+    err.hidden = false;
+    err.textContent = `⚠️ Couldn't open ${file.name}: ${e.message}`;
   }
 }
 let SAVED = [];
